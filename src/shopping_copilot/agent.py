@@ -7,6 +7,7 @@ from pathlib import Path
 from .catalog import CatalogIndex
 from .clarification import ClarificationPolicy
 from .constraints import ConstraintExtractor
+from .evidence import EvidenceFingerprintIndex
 from .facets import CandidateFacetIndex
 from .intent import IntentRouter
 from .models import ALLOWED_ATTRIBUTES
@@ -33,14 +34,24 @@ class Agent:
         self.extractor = ConstraintExtractor()
         self.intent_router = IntentRouter()
         self.facets = CandidateFacetIndex(self.catalog)
+        self.evidence_index = (
+            EvidenceFingerprintIndex(self.catalog)
+            if self.policy_config.evidence_fingerprint
+            else None
+        )
         self.retriever = MultiRouteLexicalRetriever(
             self.catalog,
             QueryBuilder(self.policy_config),
+            evidence_index=self.evidence_index,
         )
         self.clarification_policy = ClarificationPolicy()
         self.question_estimator = QuestionValueEstimator(
             self.facets,
             candidate_limit=self.policy_config.question_candidate_limit,
+            other_max_asks=self.policy_config.other_max_asks,
+            other_min_remaining_turns=self.policy_config.other_min_remaining_turns,
+            other_routes=self.policy_config.other_routes,
+            other_value_floor=self.policy_config.other_value_floor,
         )
         self.candidate_portfolio = AdaptiveCandidatePortfolio(
             self.catalog,
@@ -77,20 +88,47 @@ class Agent:
         except (TypeError, ValueError):
             safe_top_k = 0
 
-        extraction = self.extractor.extract(message, safe_turn, state.last_asked_attribute)
+        protocol_feedback = (
+            self.policy_config.response_semantics
+            or self.policy_config.other_max_asks > 1
+        )
+        previous_retrieval_terms = state.current_retrieval_terms
+        extraction = self.extractor.extract(
+            message,
+            safe_turn,
+            state.last_asked_attribute,
+            protocol_feedback=protocol_feedback,
+        )
         route = self.intent_router.route(message, extraction)
         if extraction.declined_attributes:
             state.mark_declined(extraction.declined_attributes)
-        if route == "override":
+        if extraction.exhausted_attributes:
+            state.mark_exhausted(extraction.exhausted_attributes)
+        feedback_only = bool(extraction.feedback_event) and self.policy_config.response_semantics
+        if self.policy_config.response_semantics and extraction.decline_only:
+            state.clear_current_feedback()
+        if route == "override" and not feedback_only:
             state.apply_override(extraction, safe_turn, message)
-        elif not extraction.decline_only:
+        elif not extraction.decline_only and not feedback_only:
             state.merge_constraints(extraction)
+        elif feedback_only and extraction.feedback_event == "exhausted":
+            state.clear_current_feedback()
+        if feedback_only:
+            turn_retrieval_terms = (
+                previous_retrieval_terms
+                if extraction.feedback_event == "no_question"
+                else ()
+            )
+        else:
+            turn_retrieval_terms = extraction.retrieval_terms
         state.record_turn(
             safe_turn,
             message,
             route,
-            extraction.retrieval_terms,
+            turn_retrieval_terms,
             extraction.declined_attributes,
+            extraction.exhausted_attributes,
+            extraction.feedback_event if feedback_only else None,
         )
 
         retrieval = self.retriever.retrieve_with_diagnostics(state, safe_top_k)
@@ -120,9 +158,14 @@ class Agent:
         if ask_attribute not in ALLOWED_ATTRIBUTES:
             ask_attribute = None
         state.set_decision_debug(question=question_debug, portfolio=portfolio_debug)
+        prior_ask_count = state.ask_counts.get(ask_attribute or "", 0)
         state.mark_asked(ask_attribute)
         return {
-            "message": self.clarification_policy.message(ask_attribute, len(identifiers)),
+            "message": self.clarification_policy.message(
+                ask_attribute,
+                len(identifiers),
+                prior_ask_count=prior_ask_count,
+            ),
             "ask_attribute": ask_attribute,
             "recommendations": [{"parent_asin": parent_asin} for parent_asin in identifiers],
             "usage": {"prompt_tokens": 0, "completion_tokens": 0},
@@ -153,6 +196,8 @@ class Agent:
             ],
             "asked_attributes": sorted(state.asked_attributes),
             "declined_attributes": sorted(state.declined_attributes),
+            "exhausted_attributes": sorted(state.exhausted_attributes),
+            "ask_counts": dict(sorted(state.ask_counts.items())),
             "last_asked_attribute": state.last_asked_attribute,
             "candidate_count": state.last_candidate_count,
             "retrieval_sources": state.last_retrieval_sources,
@@ -167,4 +212,5 @@ class Agent:
             "policy_mode": self.policy_config.name,
             "question_value": state.last_question_decision,
             "candidate_portfolio": state.last_portfolio_decision,
+            "evidence_index": self.evidence_index.statistics if self.evidence_index else {},
         }

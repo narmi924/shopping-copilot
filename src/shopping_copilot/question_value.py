@@ -96,9 +96,22 @@ def _normalized_entropy(counts: Counter[str]) -> float:
 class QuestionValueEstimator:
     """Choose the missing slot with the greatest bounded partition utility."""
 
-    def __init__(self, facets: CandidateFacetIndex, *, candidate_limit: int = 60) -> None:
+    def __init__(
+        self,
+        facets: CandidateFacetIndex,
+        *,
+        candidate_limit: int = 60,
+        other_max_asks: int = 1,
+        other_min_remaining_turns: int = 3,
+        other_routes: tuple[str, ...] = ("buying", "browsing", "override"),
+        other_value_floor: float = 0.0,
+    ) -> None:
         self.facets = facets
         self.candidate_limit = max(10, int(candidate_limit))
+        self.other_max_asks = max(0, int(other_max_asks))
+        self.other_min_remaining_turns = max(0, int(other_min_remaining_turns))
+        self.other_routes = frozenset(str(route) for route in other_routes)
+        self.other_value_floor = max(0.0, min(1.0, float(other_value_floor)))
 
     def _partition_factors(self, identifiers: list[str], attribute: str) -> tuple[float, float]:
         if not identifiers:
@@ -154,7 +167,11 @@ class QuestionValueEstimator:
         }
 
         for attribute in FACET_ATTRIBUTES:
-            if attribute in state.asked_attributes or attribute in state.declined_attributes:
+            if (
+                attribute in state.asked_attributes
+                or attribute in state.declined_attributes
+                or attribute in state.exhausted_attributes
+            ):
                 continue
             allow_active_category = (
                 route == "override"
@@ -183,6 +200,33 @@ class QuestionValueEstimator:
             scores.append((attribute, min(1.0, usefulness), factors))
 
         scores.sort(key=lambda item: (-item[1], FACET_ATTRIBUTES.index(item[0]), item[0]))
+        other_ask_count = state.ask_counts.get("other", 0)
+        other_available = (
+            "other" in ALLOWED_ATTRIBUTES
+            and "other" not in state.declined_attributes
+            and "other" not in state.exhausted_attributes
+            and other_ask_count < self.other_max_asks
+            and (other_ask_count == 0 or route in self.other_routes)
+            and remaining_turns >= self.other_min_remaining_turns
+        )
+        other_score = self.other_value_floor * uncertainty * turn_factor
+        if route == "override" and state.replacement_scope == "ambiguous":
+            other_score *= 1.15
+        if other_available and other_score > 0.0 and (not scores or other_score > scores[0][1]):
+            return QuestionDecision(
+                attribute="other",
+                score=min(1.0, other_score),
+                factors={
+                    "evidence_breadth": self.other_value_floor,
+                    "uncertainty": uncertainty,
+                    "turn_factor": turn_factor,
+                    "prior_ask_count": float(other_ask_count),
+                },
+                alternatives=tuple(
+                    [(name, value) for name, value, _ in scores[:3]]
+                    + [("other", min(1.0, other_score))]
+                ),
+            )
         if scores and scores[0][1] >= 0.075:
             attribute, score, factors = scores[0]
             return QuestionDecision(
@@ -192,16 +236,15 @@ class QuestionValueEstimator:
                 alternatives=tuple((name, value) for name, value, _ in scores[:4]),
             )
 
-        if (
-            "other" in ALLOWED_ATTRIBUTES
-            and "other" not in state.asked_attributes
-            and "other" not in state.declined_attributes
-            and remaining_turns >= 3
-        ):
+        if other_available:
             return QuestionDecision(
                 attribute="other",
                 score=0.05,
-                factors={"fallback": 1.0, "turn_factor": turn_factor},
+                factors={
+                    "fallback": 1.0,
+                    "turn_factor": turn_factor,
+                    "prior_ask_count": float(other_ask_count),
+                },
                 alternatives=tuple((name, value) for name, value, _ in scores[:4]),
             )
         return QuestionDecision(

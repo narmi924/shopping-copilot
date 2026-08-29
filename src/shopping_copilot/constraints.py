@@ -8,7 +8,10 @@ from .models import Constraint, ConstraintExtraction, Replacement
 from .text import (
     extract_category_terms,
     find_declined_attributes,
+    find_exhausted_attributes,
     is_decline_message,
+    is_exhausted_message,
+    is_no_question_feedback,
     lexical_terms,
     normalize_whitespace,
     retrieval_terms,
@@ -216,10 +219,35 @@ def _explicit_clauses(text: str) -> list[str]:
     return []
 
 
+def extract_evidence_clauses(text: object) -> tuple[str, ...]:
+    """Extract complete published evidence clauses without reducing them to tokens."""
+
+    normalized = normalize_whitespace(text)
+    patterns = (
+        re.compile(r"\ba\s+key\s+requirement\s+is\s*:\s*(.+)$", re.I),
+        re.compile(r"\bfor\s+that\s*,?\s+what\s+matters\s+is\s*:\s*(.+)$", re.I),
+        re.compile(r"\bwhat\s+i\s+(?:(?:actually|really)\s+)?need\s+is\s*:\s*(.+)$", re.I),
+    )
+    for pattern in patterns:
+        match = pattern.search(normalized)
+        if not match:
+            continue
+        values = [part.strip(" -;,.\t\n") for part in re.split(r"\s*;\s*", match.group(1))]
+        return tuple(dict.fromkeys(value for value in values if value))
+    return ()
+
+
 class ConstraintExtractor:
     """Extracts reusable constraints without depending on evaluator state."""
 
-    def extract(self, text: object, turn: int, last_asked: str | None = None) -> ConstraintExtraction:
+    def extract(
+        self,
+        text: object,
+        turn: int,
+        last_asked: str | None = None,
+        *,
+        protocol_feedback: bool = True,
+    ) -> ConstraintExtraction:
         message = normalize_whitespace(text)
         override = is_override_message(message)
         old_clause, new_clause, replacement_confidence = _contrast_clauses(message) if override else ("", "", 0.0)
@@ -227,24 +255,47 @@ class ConstraintExtractor:
         if override and old_clause and not new_clause:
             analysis_message = ""
         declined = find_declined_attributes(message, last_asked)
+        exhausted = find_exhausted_attributes(message, last_asked)
+        evidence_clauses = extract_evidence_clauses(message)
         if is_decline_message(message):
             return ConstraintExtraction(
                 declined_attributes=declined,
+                evidence_clauses=(),
                 decline_only=True,
                 metadata={
                     "override": override,
                     "override_scope": "global" if GLOBAL_OVERRIDE_RE.search(message) else "slots",
                     "replacement_text": "",
+                    "source_turn": max(0, int(turn)),
+                },
+            )
+        if protocol_feedback and is_exhausted_message(message):
+            return ConstraintExtraction(
+                exhausted_attributes=exhausted,
+                evidence_clauses=(),
+                decline_only=True,
+                feedback_event="exhausted",
+                metadata={
+                    "override": False,
+                    "override_scope": "none",
+                    "replacement_text": "",
+                    "source_turn": max(0, int(turn)),
                 },
             )
 
         result = ConstraintExtraction(
             category_terms=extract_category_terms(analysis_message),
-            retrieval_terms=retrieval_terms(analysis_message),
+            retrieval_terms=retrieval_terms(
+                analysis_message,
+                protocol_feedback=protocol_feedback,
+            ),
+            evidence_clauses=evidence_clauses,
+            feedback_event="no_question" if is_no_question_feedback(message) else None,
             metadata={
                 "override": override,
                 "override_scope": "global" if GLOBAL_OVERRIDE_RE.search(message) else "slots",
                 "replacement_text": analysis_message if override else "",
+                "source_turn": max(0, int(turn)),
             },
         )
         lowered = analysis_message.lower()

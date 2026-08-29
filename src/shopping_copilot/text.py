@@ -33,13 +33,24 @@ CONVERSATION_NOISE = {
 }
 
 DECLINE_PATTERNS = (
-    re.compile(r"\bno\s+(?:additional\s+)?preference\b", re.IGNORECASE),
+    re.compile(r"\bno\s+preference\b", re.IGNORECASE),
     re.compile(r"\b(?:do\s+not|don['’]?t)\s+have\s+(?:a\s+)?preference\b", re.IGNORECASE),
     re.compile(r"\b(?:use|trust)\s+your\s+(?:best\s+)?judg(?:e)?ment\b", re.IGNORECASE),
     re.compile(r"\b(?:anything|either)\s+is\s+fine\b", re.IGNORECASE),
     re.compile(r"\bno\s+strong\s+feelings?\b", re.IGNORECASE),
     re.compile(r"\bindifferent\s+(?:to|about)\b", re.IGNORECASE),
     re.compile(r"\b(?:stop|don['’]?t\s+keep)\s+asking\b", re.IGNORECASE),
+)
+
+EXHAUSTED_PREFERENCE_RE = re.compile(
+    r"\b(?:do\s+not|don['’]?t)\s+have\s+(?:an?\s+)?additional\s+preference\b|"
+    r"\bno\s+additional\s+preference\b",
+    re.IGNORECASE,
+)
+
+NO_QUESTION_FEEDBACK_RE = re.compile(
+    r"\b(?:ask|tell)\s+me\s+(?:about\s+)?(?:one\s+)?specific\s+attribute\b",
+    re.IGNORECASE,
 )
 
 CATEGORY_HINTS = {
@@ -71,6 +82,12 @@ def normalize_whitespace(value: object) -> str:
     return SPACE_RE.sub(" ", str(value or "")).strip()
 
 
+def normalize_evidence_key(value: object, *, limit: int = 180) -> str:
+    """Normalize a complete evidence value using the released catalog contract."""
+
+    return normalize_whitespace(value).strip(" -;,.\t\n")[: max(0, int(limit))].rstrip()
+
+
 def flatten_text(value: object) -> str:
     if value is None:
         return ""
@@ -99,8 +116,28 @@ def is_decline_message(text: str) -> bool:
     return any(pattern.search(text) for pattern in DECLINE_PATTERNS)
 
 
+def is_exhausted_message(text: str) -> bool:
+    """Return whether a slot has no undisclosed value without retracting old evidence."""
+
+    return bool(EXHAUSTED_PREFERENCE_RE.search(text))
+
+
+def is_no_question_feedback(text: str) -> bool:
+    return bool(NO_QUESTION_FEEDBACK_RE.search(text))
+
+
 def find_declined_attributes(text: str, last_asked: str | None = None) -> set[str]:
     if not is_decline_message(text):
+        return set()
+    lowered = text.lower().replace("use case", "use_case")
+    mentioned = {attribute for attribute in ATTRIBUTE_NAMES if re.search(rf"\b{re.escape(attribute)}\b", lowered)}
+    if mentioned:
+        return mentioned
+    return {last_asked} if last_asked in ATTRIBUTE_NAMES else set()
+
+
+def find_exhausted_attributes(text: str, last_asked: str | None = None) -> set[str]:
+    if not is_exhausted_message(text):
         return set()
     lowered = text.lower().replace("use case", "use_case")
     mentioned = {attribute for attribute in ATTRIBUTE_NAMES if re.search(rf"\b{re.escape(attribute)}\b", lowered)}
@@ -136,8 +173,13 @@ def lexical_terms(text: str, *, limit: int = 80, include_price_tokens: bool = Tr
     return unique_terms(values, limit)
 
 
-def retrieval_terms(text: str, *, limit: int = 80) -> tuple[str, ...]:
-    if is_decline_message(text):
+def retrieval_terms(
+    text: str,
+    *,
+    limit: int = 80,
+    protocol_feedback: bool = True,
+) -> tuple[str, ...]:
+    if is_decline_message(text) or (protocol_feedback and is_exhausted_message(text)):
         return ()
     terms = list(lexical_terms(text, limit=limit))
     for match in THRESHOLD_BUDGET_RE.finditer(text):

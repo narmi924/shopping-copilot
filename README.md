@@ -10,20 +10,20 @@ The unchanged official evaluator completed all 200 public sessions with zero mod
 
 | Metric | Official baseline | Current offline Agent | Absolute change |
 |---|---:|---:|---:|
-| Hit Rate@10 | 0.125000 | 0.835000 | +0.710000 |
-| MRR | 0.068034 | 0.515817 | +0.447783 |
-| MTTC (lower is better) | 9.810000 | 3.890000 | -5.920000 |
-| Efficiency | 0.119000 | 0.711000 | +0.592000 |
-| Recommended TechnicalScore | 0.106710 | 0.714445 | +0.607735 |
+| Hit Rate@10 | 0.125000 | 0.840000 | +0.715000 |
+| MRR | 0.068034 | 0.519359 | +0.451325 |
+| MTTC (lower is better) | 9.810000 | 3.865000 | -5.945000 |
+| Efficiency | 0.119000 | 0.713500 | +0.594500 |
+| Recommended TechnicalScore | 0.106710 | 0.718508 | +0.611798 |
 
 | Scenario | Baseline HR@10 | Current HR@10 | Change |
 |---|---:|---:|---:|
 | Buying | 0.237500 | 0.937500 | +0.700000 |
 | Browsing | 0.025000 | 0.925000 | +0.900000 |
-| Intent Override | 0.133333 | 0.366667 | +0.233334 |
+| Intent Override | 0.133333 | 0.400000 | +0.266667 |
 | Boundary | 0.000000 | 0.700000 | +0.700000 |
 
-The current configuration favors general budget and override safeguards over selecting rules for one public evaluation run. It is intended to improve generalization and reduce public-set overfitting risk. Reproduction details and the V1-to-current progression are recorded in [docs/evaluation.md](docs/evaluation.md).
+The current configuration favors general budget and replacement safeguards over selecting rules for one public evaluation run. It was selected using public aggregates, generic metamorphic tests, and a private catalog-derived stress benchmark intended to reduce public-set overfitting risk. That synthetic benchmark is not an organizer holdout and is not evidence of private-set performance. Reproduction details and the V1-to-current progression are recorded in [docs/evaluation.md](docs/evaluation.md).
 
 ## Project layout
 
@@ -134,7 +134,8 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 
 - isolated `SessionState`, safe profile copies, deterministic reset semantics, and bounded diagnostics;
 - history-aware current/constraint/stable/profile retrieval routes;
-- Buying, Browsing, and Intent Override routing with conservative slot replacement;
+- Buying, Browsing, and Intent Override routing with slot-aware attribute/category replacement;
+- explicit negative constraints, constraint provenance, and bounded dual hypotheses for ambiguous overrides;
 - no-preference/declined-attribute handling that does not contaminate queries;
 - in-memory SQLite FTS5, strict and broad retrieval tracks, weighted RRF, and bounded constraint-coverage reranking;
 - structured budget scoring, deterministic fallbacks, catalog membership validation, and deduplication;
@@ -150,6 +151,6 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 
 ## Limitations
 
-The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Intent Override remains the weakest evaluated class. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query/document caches.
+The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Intent Override remains the weakest public scenario despite the phase-two gain. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query/document caches.
 
 This repository excludes the catalog, secrets, virtual environments, caches, `results.json`, `node_modules`, and frontend build output.

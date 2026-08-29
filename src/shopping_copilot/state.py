@@ -44,6 +44,8 @@ class SessionState:
     last_candidate_count: int = 0
     last_retrieval_sources: dict[str, dict[str, Any]] = field(default_factory=dict)
     last_ranking_scores: tuple[tuple[str, float], ...] = ()
+    last_question_decision: dict[str, Any] = field(default_factory=dict)
+    last_portfolio_decision: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def create(cls, session_id: str, user_profile: object) -> "SessionState":
@@ -285,3 +287,12 @@ class SessionState:
         self.last_candidate_count = max(0, int(candidate_count))
         self.last_retrieval_sources = copy.deepcopy(sources)
         self.last_ranking_scores = tuple((str(identifier), float(score)) for identifier, score in ranking_scores)
+
+    def set_decision_debug(
+        self,
+        *,
+        question: dict[str, Any] | None = None,
+        portfolio: dict[str, Any] | None = None,
+    ) -> None:
+        self.last_question_decision = copy.deepcopy(question or {})
+        self.last_portfolio_decision = copy.deepcopy(portfolio or {})

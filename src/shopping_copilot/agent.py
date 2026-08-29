@@ -7,9 +7,13 @@ from pathlib import Path
 from .catalog import CatalogIndex
 from .clarification import ClarificationPolicy
 from .constraints import ConstraintExtractor
+from .facets import CandidateFacetIndex
 from .intent import IntentRouter
 from .models import ALLOWED_ATTRIBUTES
-from .retrieval.lexical import MultiRouteLexicalRetriever
+from .policy import PolicyConfig
+from .portfolio import AdaptiveCandidatePortfolio
+from .question_value import QuestionValueEstimator
+from .retrieval.lexical import MultiRouteLexicalRetriever, QueryBuilder
 from .state import SessionState
 from .text import normalize_whitespace
 
@@ -17,13 +21,32 @@ from .text import normalize_whitespace
 class Agent:
     """Required competition interface backed only by local deterministic logic."""
 
-    def __init__(self, catalog_path: str | Path = "data/catalog.jsonl") -> None:
+    def __init__(
+        self,
+        catalog_path: str | Path = "data/catalog.jsonl",
+        *,
+        policy_mode: str | None = None,
+    ) -> None:
         self.catalog_path = Path(catalog_path)
+        self.policy_config = PolicyConfig.resolve(policy_mode)
         self.catalog = CatalogIndex(self.catalog_path)
         self.extractor = ConstraintExtractor()
         self.intent_router = IntentRouter()
-        self.retriever = MultiRouteLexicalRetriever(self.catalog)
+        self.facets = CandidateFacetIndex(self.catalog)
+        self.retriever = MultiRouteLexicalRetriever(
+            self.catalog,
+            QueryBuilder(self.policy_config),
+        )
         self.clarification_policy = ClarificationPolicy()
+        self.question_estimator = QuestionValueEstimator(
+            self.facets,
+            candidate_limit=self.policy_config.question_candidate_limit,
+        )
+        self.candidate_portfolio = AdaptiveCandidatePortfolio(
+            self.catalog,
+            self.facets,
+            self.policy_config,
+        )
         self._sessions: dict[str, SessionState] = {}
 
     @property
@@ -71,18 +94,32 @@ class Agent:
         )
 
         retrieval = self.retriever.retrieve_with_diagnostics(state, safe_top_k)
-        identifiers = retrieval.identifiers
+        candidate_scores = retrieval.candidate_scores
+        portfolio_debug: dict[str, object] = {}
+        if self.policy_config.candidate_portfolio:
+            portfolio = self.candidate_portfolio.select(state, candidate_scores, safe_top_k)
+            identifiers = list(portfolio.identifiers)
+            portfolio_debug = portfolio.as_debug()
+        else:
+            identifiers = retrieval.identifiers
         identifiers = list(dict.fromkeys(item for item in identifiers if self.catalog.contains(item)))[:safe_top_k]
         state.set_recommendations(identifiers)
+        score_by_id = dict(candidate_scores)
         valid_scores = [
-            (identifier, score)
-            for identifier, score in retrieval.ranking_scores
-            if identifier in identifiers
+            (identifier, score_by_id.get(identifier, 0.0))
+            for identifier in identifiers
         ]
         state.set_retrieval_debug(retrieval.candidate_count, retrieval.sources, valid_scores)
-        ask_attribute = self.clarification_policy.choose(state)
+        question_debug: dict[str, object] = {}
+        if self.policy_config.question_value:
+            question = self.question_estimator.choose(state, candidate_scores)
+            ask_attribute = question.attribute
+            question_debug = question.as_debug()
+        else:
+            ask_attribute = self.clarification_policy.choose(state)
         if ask_attribute not in ALLOWED_ATTRIBUTES:
             ask_attribute = None
+        state.set_decision_debug(question=question_debug, portfolio=portfolio_debug)
         state.mark_asked(ask_attribute)
         return {
             "message": self.clarification_policy.message(ask_attribute, len(identifiers)),
@@ -127,4 +164,7 @@ class Agent:
             "replacement_scope": state.replacement_scope,
             "override_confidence": round(state.override_confidence, 3),
             "turn_count": len(state.turn_history),
+            "policy_mode": self.policy_config.name,
+            "question_value": state.last_question_decision,
+            "candidate_portfolio": state.last_portfolio_decision,
         }

@@ -7,6 +7,7 @@ import sqlite3
 from collections import OrderedDict
 from pathlib import Path
 from types import MappingProxyType
+from collections.abc import Iterator
 from typing import Mapping
 
 from .models import ProductRecord, SearchHit
@@ -137,6 +138,11 @@ class CatalogIndex:
 
     def get_product(self, parent_asin: object) -> ProductRecord | None:
         return self._products.get(str(parent_asin))
+
+    def iter_products(self) -> Iterator[ProductRecord]:
+        """Iterate over immutable records in frozen catalog order."""
+
+        return iter(self._products.values())
 
     def fallback_ids(self, limit: int) -> list[str]:
         return list(self._fallback_ids[: max(0, int(limit))])

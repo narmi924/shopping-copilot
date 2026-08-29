@@ -8,6 +8,7 @@ from .fusion import weighted_reciprocal_rank_fusion
 from .rerank import ConstraintCoverageReranker
 from ..catalog import CatalogIndex
 from ..models import QueryRoute
+from ..policy import PolicyConfig
 from ..state import SessionState
 from ..text import unique_terms
 
@@ -21,6 +22,9 @@ class QueryBuilder:
         "stable": 1.8,
         "profile": 0.35,
     }
+
+    def __init__(self, config: PolicyConfig | None = None) -> None:
+        self.config = config or PolicyConfig.for_name("control")
 
     def build(self, state: SessionState) -> list[QueryRoute]:
         values = {
@@ -51,6 +55,7 @@ class RetrievalOutcome:
     candidate_count: int
     sources: dict[str, dict[str, object]]
     ranking_scores: list[tuple[str, float]]
+    candidate_scores: list[tuple[str, float]]
 
 
 class MultiRouteLexicalRetriever:
@@ -69,7 +74,7 @@ class MultiRouteLexicalRetriever:
     def retrieve_with_diagnostics(self, state: SessionState, top_k: int) -> RetrievalOutcome:
         safe_top_k = max(0, int(top_k))
         if safe_top_k == 0:
-            return RetrievalOutcome([], 0, {}, [])
+            return RetrievalOutcome([], 0, {}, [], [])
         routes = self.query_builder.build(state)
         candidate_limit = max(80, min(240, safe_top_k * 20))
         rankings: dict[str, list[str]] = {}
@@ -110,10 +115,10 @@ class MultiRouteLexicalRetriever:
             }
 
         fused = weighted_reciprocal_rank_fusion(rankings, weights, limit=candidate_limit)
-        reranked = self.reranker.rerank(fused, state, safe_top_k)
-        identifiers = [item.parent_asin for item in reranked]
-        ranking_scores = [(item.parent_asin, item.score) for item in reranked]
-        if len(identifiers) < safe_top_k:
+        reranked = self.reranker.rerank(fused, state, candidate_limit)
+        candidate_scores = [(item.parent_asin, item.score) for item in reranked]
+        candidate_ids = {identifier for identifier, _ in candidate_scores}
+        if len(candidate_scores) < candidate_limit:
             combined_terms = unique_terms(
                 term
                 for route in routes
@@ -122,21 +127,24 @@ class MultiRouteLexicalRetriever:
             )
             if combined_terms:
                 for hit in self.catalog.search(" ".join(combined_terms), candidate_limit):
-                    if hit.parent_asin not in identifiers:
-                        identifiers.append(hit.parent_asin)
-                        ranking_scores.append((hit.parent_asin, 0.0))
-                    if len(identifiers) >= safe_top_k:
+                    if hit.parent_asin not in candidate_ids:
+                        candidate_ids.add(hit.parent_asin)
+                        candidate_scores.append((hit.parent_asin, 0.0))
+                    if len(candidate_scores) >= candidate_limit:
                         break
-        if len(identifiers) < safe_top_k:
-            for parent_asin in self.catalog.fallback_ids(safe_top_k):
-                if parent_asin not in identifiers:
-                    identifiers.append(parent_asin)
-                    ranking_scores.append((parent_asin, 0.0))
-                if len(identifiers) >= safe_top_k:
+        if len(candidate_scores) < candidate_limit:
+            for parent_asin in self.catalog.fallback_ids(candidate_limit):
+                if parent_asin not in candidate_ids:
+                    candidate_ids.add(parent_asin)
+                    candidate_scores.append((parent_asin, 0.0))
+                if len(candidate_scores) >= candidate_limit:
                     break
+        identifiers = [identifier for identifier, _ in candidate_scores[:safe_top_k]]
+        ranking_scores = candidate_scores[:safe_top_k]
         return RetrievalOutcome(
-            identifiers=identifiers[:safe_top_k],
+            identifiers=identifiers,
             candidate_count=len(fused),
             sources=sources,
-            ranking_scores=ranking_scores[:safe_top_k],
+            ranking_scores=ranking_scores,
+            candidate_scores=candidate_scores,
         )

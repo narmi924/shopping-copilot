@@ -12,11 +12,17 @@ flowchart LR
     Q --> L[Multi-route Lexical Retrieval]
     L --> R[Weighted RRF]
     R --> CR[Constraint Coverage Reranker]
-    CR --> C[Clarification Policy]
-    C --> O[Agent Response]
+    CR --> CP[Bounded Candidate Pool]
+    CP --> V[Question Value Estimator]
+    CP --> T[Adaptive Top-10 Portfolio]
+    F[Read-only Candidate Facets] --> V
+    F --> T
+    V --> O[Agent Response]
+    T --> O
 
     K[(Read-only frozen catalog)] --> L
     K --> CR
+    K --> F
     P[Safe anonymized profile fields] --> Q
 
     UI[React UI] -. optional .-> API[Thin FastAPI adapter]
@@ -35,7 +41,7 @@ Only `preference_tags` and `summary` contribute to the low-weight profile route.
 
 The Agent cannot see and never reads `public_set.jsonl`, `ground_truth`, `intent_card`, `behavior`, `scenario_type`, evaluator state, or evaluator implementation details at runtime. It imports no evaluator module and derives no identifier outside the frozen catalog.
 
-The catalog is parsed once during `CatalogIndex` construction. Immutable product dataclasses sit behind a read-only mapping; SQLite FTS5 is built in memory and switched to query-only mode. The catalog JSONL is never modified. Bounded LRU-style caches memoize deterministic searches and product term sets without changing ranking.
+The catalog is parsed once during `CatalogIndex` construction. Immutable product dataclasses sit behind a read-only mapping; SQLite FTS5 is built in memory and switched to query-only mode. The catalog JSONL is never modified. Bounded LRU-style caches memoize deterministic searches, product term sets, and lazily derived facets without changing the underlying data.
 
 The copied evaluator, public set, API contract, and evaluation config are protected by recorded SHA256 values. The official labels and evaluator are never modified.
 
@@ -66,7 +72,17 @@ Superseded terms therefore do not enter the active-constraint route. A no-prefer
 
 Each route retrieves independently from FTS5. Buying/Browsing turns may add an all-terms precision track; override turns stay on broad fusion for that response. Weighted Reciprocal Rank Fusion deduplicates by identifier and orders by fused score, best route rank, then `parent_asin`.
 
-A bounded reranker combines the fused rank with current-message coverage, active slot coverage, stable context, and structured budget evidence. Override turns additionally reward current-turn slot coverage and apply capped penalties for explicit negative and most recently superseded values. These are ranking signals, not hard catalog exclusions, so one uncertain parse cannot remove the candidate pool. The clarification policy asks about category or another requirement when replacement scope remains ambiguous, while still returning the ranked Top K.
+A bounded reranker combines the fused rank with current-message coverage, active slot coverage, stable context, and structured budget evidence. Override turns additionally reward current-turn slot coverage and apply capped penalties for explicit negative and most recently superseded values. These are ranking signals, not hard catalog exclusions, so one uncertain parse cannot remove the candidate pool.
+
+## Decision-aware dialogue policy
+
+The candidate facet index derives only evidenced values from visible catalog fields. It supports category, brand/store, color, material, style, size, price bands, feature terms, and use-case terms, tolerates missing metadata, and uses a bounded lazy cache rather than a second full product copy.
+
+For every legal unasked and non-declined attribute, the Question Value Estimator computes a bounded utility from candidate metadata coverage, normalized partition gain, route relevance, score uncertainty, override ambiguity, and remaining turns. Active constraints are normally excluded. Ambiguous replacement is the exception: category may be asked again when it distinguishes the two retained hypotheses. A low-value `other` fallback is available early in the dialogue, and late turns may return no question. The customer-facing message is still generated from the selected legal attribute, and recommendations are returned on the same turn.
+
+The Top-10 selector treats recommendations as one portfolio. It preserves an ordered precision core, then chooses a small exploration tail from the bounded reranked pool using relevance, current/active constraint coverage, facet novelty, near-duplicate similarity, and negative/superseded evidence. The accepted configuration uses almost all precision for Buying, roughly 70% precision for early vague Browsing, about 85% after useful constraints accumulate, at least 80% after a decline, and 75–85% for Override depending on confidence. These fractions were selected through the documented component experiments; diversity operates only below the protected ranks.
+
+The previously accepted lexical ordering remains available as a deterministic fallback by constructing `Agent(..., policy_mode="control")` or setting `SHOPPING_COPILOT_POLICY_MODE=control`. No generated index, model weight, network call, or extra runtime dependency is required.
 
 ## Optional presentation path
 

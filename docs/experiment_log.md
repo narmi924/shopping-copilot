@@ -98,3 +98,86 @@ Decision: rejected. The intended unseen-target Browsing slice did not meet the
 minimum improvement gate, the public Override hit gain disappeared, and the
 dependency/cache/memory cost was therefore not justified. No semantic code,
 dependency, matrix, or cache is included in the selected implementation.
+
+## 2026-08-30 — Decision-aware dialogue and Top-10 portfolio
+
+Control source: `1bc3ac74d9e2e7b017ab9a93d589917bcda66adc` (the manually merged
+Override V2). Environment: CPython 3.13.1, uv 0.12.5, Windows 10.0.26200 x64.
+The behavior-equivalent control rerun reproduced HR@10 0.840000, MRR 0.519359,
+MTTC 3.865000, and TechnicalScore 0.718508. It took 63.774 seconds and used an
+approximate 556.867 MiB peak working set.
+
+Two deterministic unseen-target benchmarks were used alongside the public
+evaluator:
+
+- the unchanged broad stress set has 160 sessions, 40 per scenario, diverse
+  metadata-rich targets, fixed seed 20260829, and separate report templates;
+- the target-like matched set has 200 sessions in the public 80/80/30/10
+  scenario proportions and fixed seed 20260830. Its non-public targets are
+  nearest aggregate matches for category group, popularity quantile, rating
+  band, price presence, metadata completeness, and field availability.
+
+Both exclude all public target identifiers. Generated conversations, scorer
+targets, and per-session output remain private. Neither benchmark is an
+organizer holdout or evidence of private-set performance.
+
+The target-like control scored 197/200 overall (HR@10 0.985000, MRR 0.623685,
+MTTC 3.830000). Its Browsing slice scored 79/80, HR@10 0.987500, MRR 0.528909,
+and MTTC 4.987500.
+
+### Isolated component comparison
+
+| Candidate | Public HR@10 | Public MRR | Public MTTC | Public TechnicalScore | Broad Browsing hits | Matched Browsing hits | Matched Browsing MRR | Decision |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Override V2 control | 0.840000 | 0.519359 | 3.865000 | 0.718508 | 11/40 | 79/80 | 0.528909 | control |
+| Question Value only | 0.910000 | 0.564736 | 4.430000 | 0.755821 | 11/40 | 75/80 | 0.542882 | reject |
+| Candidate Portfolio only | 0.845000 | 0.516831 | 3.870000 | 0.720149 | 13/40 | 79/80 | 0.568110 | component only |
+| Question Value + Portfolio | 0.915000 | 0.561236 | 4.400000 | 0.757871 | 13/40 | 76/80 | 0.591319 | accept |
+| Adaptive Profile only | 0.840000 | 0.518526 | 3.865000 | 0.718258 | 11/40 | 79/80 | 0.528909 | reject |
+| All three components | 0.915000 | 0.560403 | 4.400000 | 0.757621 | 13/40 | 76/80 | 0.591319 | reject |
+| Accepted pair + catalog prior | 0.915000 | 0.561756 | 4.395000 | 0.758127 | 13/40 | 75/80 | 0.589534 | reject |
+
+Question Value alone improved the public evaluator but missed the matched
+Browsing gate: MRR increased only 0.013973 and four targets stopped reaching
+Top 10. The portfolio alone added two broad Browsing hits and increased matched
+Browsing MRR by 0.039201, which was useful but below the 0.05 standalone gate.
+Together, the components raised matched Browsing MRR by 0.062410 and reduced its
+MTTC by 1.362500 turns while adding two broad Browsing hits.
+
+Adaptive Profile produced no hit, MTTC, or unseen-target change and reduced
+public MRR by 0.000833. Adding it to the accepted pair produced the same
+synthetic result, lower public MRR, and higher runtime. The bounded catalog
+prior produced only a 0.000520 public MRR change, regressed matched Browsing,
+and took 104.282 seconds (1.635 times control), so both were removed.
+
+### Accepted aggregate
+
+| Metric | Control | Accepted | Change |
+|---|---:|---:|---:|
+| Hit Rate@10 | 0.840000 | 0.915000 | +0.075000 |
+| MRR | 0.519359 | 0.561236 | +0.041877 |
+| MTTC | 3.865000 | 4.400000 | +0.535000 |
+| Efficiency | 0.713500 | 0.660000 | -0.053500 |
+| Recommended TechnicalScore | 0.718508 | 0.757871 | +0.039363 |
+
+| Public scenario | Control hits | Accepted hits | Change |
+|---|---:|---:|---:|
+| Buying | 75/80 | 75/80 | 0 |
+| Browsing | 74/80 | 75/80 | +1 |
+| Intent Override | 12/30 | 25/30 | +13 |
+| Boundary | 7/10 | 8/10 | +1 |
+
+The accepted broad stress result was 114/160 (HR@10 0.712500, MRR 0.465191,
+MTTC 2.512500), versus control 110/160, 0.687500, 0.468108, and 2.587500.
+The accepted target-like result was 194/200 (HR@10 0.970000, MRR 0.647260,
+MTTC 3.070000); it trades three late Browsing hits for higher overall MRR and
+faster convergence. The component-selection run took 80.469 seconds (1.262
+times control). After rejected code was removed, the final verification took
+78.414 seconds (1.230 times control) with a 572.379 MiB approximate peak working
+set. All 57 tests passed.
+
+Decision: accept Question Value + Candidate Portfolio. It is the smallest
+candidate that passed protected-file, public-score, scenario-preservation,
+matched-Browsing, broad-Browsing, determinism, runtime, memory, isolation, and
+test gates. The MTTC regression on the public simulator is retained as an
+explicit tradeoff because both unseen-target suites provide stronger outcomes.

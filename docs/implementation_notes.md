@@ -26,6 +26,18 @@ When replacement scope is genuinely ambiguous, the state keeps prior context and
 
 `respond` rejects an uninitialized session, safely normalizes malformed turn/top-k values, always returns a string message and list, emits only legal clarification attributes, validates every identifier against the frozen catalog, removes duplicates, caps output at `top_k`, and reports zero non-negative token usage.
 
+## Candidate facets and question value
+
+`CandidateFacetIndex` derives a conservative read-only view from product fields already held by `CatalogIndex`. It does not invent missing values. Category and store remain normalized phrases; color, material, style, and use case use general vocabularies; size requires contextual evidence; price is reduced to a coarse band; and feature terms exclude values already represented by another facet. The cache is bounded at 8,192 products and is populated only for products entering a candidate pool.
+
+The Question Value Estimator considers only legal attributes that are not already active, asked, or declined. Coverage measures how often a facet is evidenced in the bounded candidate set. Partition gain uses normalized entropy for single-valued facets and the strongest bounded binary partition for multi-valued feature/use-case terms. Route relevance, candidate-score uncertainty, override ambiguity, and remaining turns scale the result. This state is available to the optional debug view but never appears in the official Agent response.
+
+## Adaptive Top-10 portfolio
+
+Retrieval now retains a bounded scored pool after the existing lexical reranker. High-confidence Buying preserves the original Top K ordering. Early vague Browsing protects the first seven ranks at `top_k=10` and uses the lower three positions for deterministic facet coverage; after useful constraints accumulate, the precision core grows. Override and no-preference paths use more conservative exploration. Tail gain combines normalized relevance, current and active constraint coverage, new facet coverage, near-duplicate similarity, and bounded negative/superseded penalties. Final identifiers remain unique, catalog-valid, and rank ordered.
+
+The earlier ranking path remains available as a lexical control mode. It uses the same catalog, state reducer, query builder, RRF, and reranker without Question Value or portfolio selection.
+
 ## Presentation isolation
 
 FastAPI is an optional thin adapter. It lazily creates the same Agent core, serializes access with an `RLock`, maintains isolated demo sessions, and enriches catalog-valid identifiers for product cards. React uses only the public demo endpoints. Neither layer is imported by `starter.agent` or required by the evaluator.
@@ -34,4 +46,4 @@ The browser QA pass covered session creation, a budget-constrained search, a sec
 
 ## Evaluation hygiene
 
-Only the unchanged evaluator reads public ground truth and simulator state. The Agent has no runtime path to labels or evaluator internals, contains no sample-specific rules, and never modifies or augments the catalog. The repository retains compact aggregate metric summaries. The current implementation is the smallest phase-two candidate that passed the documented public, synthetic, runtime, isolation, and invariant gates. The rejected semantic experiment and its generated index are not part of the runtime.
+Only the unchanged evaluator reads public ground truth and simulator state. The Agent has no runtime path to labels or evaluator internals, contains no sample-specific rules, and never modifies or augments the catalog. The repository retains compact aggregate metric summaries. The current implementation is the smallest phase-three candidate that passed the documented public, broad-stress, target-like, runtime, isolation, and invariant gates. Rejected adaptive-profile, catalog-prior, and semantic experiments are not part of the runtime.

@@ -14,7 +14,7 @@ The `starter.Agent` adapter resolves `src` using `pathlib.Path`; no drive letter
 
 ## Constraint and query handling
 
-The extractor uses general token dictionaries and regular expressions, never public sample strings, sample IDs, target identifiers, or label-derived lookup tables. No-preference messages are handled before query construction, so decline language does not become product terms.
+The extractor uses general token dictionaries and regular expressions, never public sample strings, sample IDs, target identifiers, or label-derived lookup tables. Genuine no-preference and no-additional-preference messages are handled before query construction, so feedback language does not become product terms. The former supersedes the named slot; the latter records that the slot has no undisclosed value while preserving active constraints.
 
 Threshold budgets are represented as structured constraints and scored against catalog price when a price exists. The highest-weight current-message route excludes the threshold number to avoid treating `$80` as a match for unrelated `80% nylon` text. Category evidence is checked primarily in title/category fields during reranking.
 
@@ -30,7 +30,13 @@ When replacement scope is genuinely ambiguous, the state keeps prior context and
 
 `CandidateFacetIndex` derives a conservative read-only view from product fields already held by `CatalogIndex`. It does not invent missing values. Category and store remain normalized phrases; color, material, style, and use case use general vocabularies; size requires contextual evidence; price is reduced to a coarse band; and feature terms exclude values already represented by another facet. The cache is bounded at 8,192 products and is populated only for products entering a candidate pool.
 
-The Question Value Estimator considers only legal attributes that are not already active, asked, or declined. Coverage measures how often a facet is evidenced in the bounded candidate set. Partition gain uses normalized entropy for single-valued facets and the strongest bounded binary partition for multi-valued feature/use-case terms. Route relevance, candidate-score uncertainty, override ambiguity, and remaining turns scale the result. This state is available to the optional debug view but never appears in the official Agent response.
+The Question Value Estimator considers only legal specific attributes that are not already active, asked, declined, or exhausted. Coverage measures how often a facet is evidenced in the bounded candidate set. Partition gain uses normalized entropy for single-valued facets and the strongest bounded binary partition for multi-valued feature/use-case terms. Route relevance, candidate-score uncertainty, override ambiguity, and remaining turns scale the result. `other` is the only repeatable attribute, is capped at two asks, and stops after an exhausted response. This state is available to the optional debug view but never appears in the official Agent response.
+
+## Evidence Fingerprint retrieval
+
+`EvidenceFingerprintIndex` builds a query-only in-memory SQLite reverse index from the same immutable product records used by FTS5. It indexes only visible feature strings, detail key/value pairs, detected material and color, and available price evidence. Whitespace and surrounding separators are normalized independently to the published 180-character contract; no evaluator module is imported.
+
+Lookup supports an exact clause, deterministic weighted unions, and multi-clause intersections. Ranking discounts high-collision keys, rewards independent exact matches, caps broad postings, and retains field provenance. Current-turn clauses receive more weight than compatible historical clauses. Declines and replacements move affected evidence out of the active query, while the existing negative and superseded penalties remain bounded safeguards.
 
 ## Adaptive Top-10 portfolio
 
@@ -46,4 +52,4 @@ The browser QA pass covered session creation, a budget-constrained search, a sec
 
 ## Evaluation hygiene
 
-Only the unchanged evaluator reads public ground truth and simulator state. The Agent has no runtime path to labels or evaluator internals, contains no sample-specific rules, and never modifies or augments the catalog. The repository retains compact aggregate metric summaries. The current implementation is the smallest phase-three candidate that passed the documented public, broad-stress, target-like, runtime, isolation, and invariant gates. Rejected adaptive-profile, catalog-prior, and semantic experiments are not part of the runtime.
+Only the unchanged evaluator reads public ground truth and simulator state. The Agent has no runtime path to labels or evaluator internals, contains no sample-specific rules, and never modifies or augments the catalog. The repository retains compact aggregate metric summaries. The current implementation combines the Phase 3 decision policy with corrected clarification semantics, bounded repeated `other`, and catalog-derived exact evidence retrieval. Its selectable `phase3` mode omits all Phase 4 behavior. Rejected rank-recovery and more aggressive repeat policies are not part of the default runtime; previously rejected adaptive-profile, catalog-prior, and semantic experiments also remain absent.

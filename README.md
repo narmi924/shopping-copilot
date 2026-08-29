@@ -1,111 +1,132 @@
-# TechJam Conversational E-Commerce Search Challenge
+# Shopping Copilot — Track 4
 
-Build an AI shopping agent that asks useful follow-up questions and recommends the customer's hidden target product within at most 10 turns.
+Shopping Copilot is an offline-first, state-aware conversational search and recommendation agent for TechJam Track 4. The official headless entry point remains `from starter.agent import Agent`; the FastAPI and React demo is an optional presentation layer over the same deterministic core.
 
-## What You Receive
+The runtime calls no LLM, remote service, model, or production database. Product identifiers always come from the frozen 50,000-item catalog.
 
-- A frozen catalog of 50,000 products from the `Clothing_Shoes_and_Jewelry` category of Amazon Reviews 2023.
-- 200 labeled public sessions for local development.
-- A weak BM25 starter agent and deterministic local evaluator.
-- The Agent API contract and scoring rules.
+## Evaluated result
 
-The organizer keeps 800 additional sessions private for final evaluation.
+The unchanged official evaluator completed all 200 public sessions with zero model tokens.
 
-## Task
+| Metric | Official baseline | Final offline Agent | Absolute change |
+|---|---:|---:|---:|
+| Hit Rate@10 | 0.125000 | 0.835000 | +0.710000 |
+| MRR | 0.068034 | 0.515817 | +0.447783 |
+| MTTC (lower is better) | 9.810000 | 3.890000 | -5.920000 |
+| Efficiency | 0.119000 | 0.711000 | +0.592000 |
+| Recommended TechnicalScore | 0.106710 | 0.714445 | +0.607735 |
 
-For each session, your agent receives an anonymized preference profile and a short customer message. Raw user IDs, review text, timestamps, and purchase history are never disclosed. On every turn the agent may:
+| Scenario | Baseline HR@10 | Final HR@10 | Change |
+|---|---:|---:|---:|
+| Buying | 0.237500 | 0.937500 | +0.700000 |
+| Browsing | 0.025000 | 0.925000 | +0.900000 |
+| Intent Override | 0.133333 | 0.366667 | +0.233334 |
+| Boundary | 0.000000 | 0.700000 | +0.700000 |
 
-- ask a natural clarification question in `message` and identify one requested field in `ask_attribute`;
-- return a ranked list of up to 10 catalog `parent_asin` values;
-- do both in the same response.
+The final configuration favors general budget and override safeguards over selecting rules for one evaluation run. Reproduction details and the V1-to-final progression are recorded in [docs/evaluation.md](docs/evaluation.md).
 
-The session ends when the target product appears in the scored Top 10 or after turn 10. Sessions cover Buying, Browsing, Intent Override, and Boundary behavior.
-
-## Download the Catalog
-
-Download `catalog.jsonl.gz` from the GitHub Release attached to this repository, then run:
-
-```bash
-gzip -dk catalog.jsonl.gz
-mv catalog.jsonl data/catalog.jsonl
-```
-
-Verify the downloaded file using the published `SHA256SUMS` file.
-
-## Run the Starter
-
-Python 3.10 or later is recommended. The starter uses only the Python standard library.
-
-```bash
-python3 -m evaluator.local_evaluator
-```
-
-Edit `starter/agent.py` to implement your system. Do not edit the evaluator or public labels when reporting your local score.
-The command writes per-session results and aggregate metrics to `results.json`.
-
-The included weak BM25 starter scores Hit Rate@10 `0.125`, MRR `0.068034`, and
-MTTC `9.81` on the released public set. See `docs/baseline_results.json`.
-
-## Agent Interface
-
-```python
-class Agent:
-    def reset(self, session_id: str, user_profile: dict) -> None:
-        ...
-
-    def respond(self, session_id: str, user_message: str, turn: int, top_k: int) -> dict:
-        return {
-            "message": "Do you have a material preference?",
-            "ask_attribute": "material",
-            "recommendations": [
-                {"parent_asin": "B000..."},
-                {"parent_asin": "B001..."}
-            ],
-            "usage": {"prompt_tokens": 120, "completion_tokens": 30}
-        }
-```
-
-`ask_attribute` is one of `category`, `material`, `color`, `size`, `style`, `brand`, `budget`, `feature`, `use_case`, `other`, or `null`. See `docs/agent_api_contract.json`.
-
-## Technical Metrics
-
-- **Hit Rate@10:** fraction of sessions that find the target within 10 turns.
-- **MRR:** mean reciprocal rank of the target; a miss contributes zero.
-- **MTTC:** mean first-hit turn; a miss is assigned turn 11.
-- **Reported token usage:** prompt and completion tokens returned by the team's model client.
+## Project layout
 
 ```text
-TechnicalScore = 0.50 × HitRate@10 + 0.30 × MRR + 0.20 × Efficiency
-Efficiency = clip((11 - MTTC) / 10, 0, 1)
+shopping-copilot/
+├── data/                    versioned public set + ignored frozen catalog
+├── docs/official/           byte-identical official contract and rules
+├── evaluator/               byte-identical official evaluator
+├── starter/agent.py         thin official-interface adapter
+├── src/shopping_copilot/    state, intent, constraints, retrieval, policy
+├── tests/                   fast temporary-catalog and API tests
+├── scripts/                 catalog, hash, and result verification
+├── artifacts/metrics/       compact baseline and final metric summaries
+├── demo/backend/            optional thin FastAPI adapter
+└── frontend/                optional React + Vite + Ant Design demo
 ```
 
-Only exact `parent_asin` equality produces a hit. Core metrics are also reported by scenario.
+## Requirements
 
-## Model Choice and Cost
+- Python `>=3.10` (verified with CPython `3.13.1`)
+- uv `0.12.5` or ordinary `venv`/pip
+- SQLite with FTS5 (included in the verified Python build)
+- Node.js for the optional frontend (verified with Node `24.15.0`, npm `11.1.0`)
 
-Teams may use any legally accessible LLM API or local model. Teams manage their own credentials and must never commit API keys. Model choice, estimated cost, token usage, and latency must be disclosed. Token usage is a feasibility metric, not part of the core technical score. The organizer may reimburse model costs through prizes instead of issuing API keys.
+The evaluator/core has no third-party runtime dependency. FastAPI, pytest, and frontend packages are optional layers.
 
-## Files
+## Setup
 
-```text
-data/public_set.jsonl             200 labeled development sessions
-docs/competition_specification.md participant rules and evaluation protocol
-docs/agent_api_contract.json      machine-readable Agent contract
-docs/evaluation_config.json       scoring configuration
-docs/baseline_results.json        reproducible weak-starter reference score
-starter/agent.py                  editable weak starter
-evaluator/local_evaluator.py      public-set simulator and scorer
+PowerShell with uv:
+
+```powershell
+uv sync --extra test --extra demo
 ```
 
-## Judging and Submission Policy
+Ordinary Python:
 
-- Participant submission requirements: `docs/submission_rules.md`
-- Participant release checklist: `docs/participant_release_checklist.md`
-- Organizer-only final judging controls: `organizer/JUDGING_RUNBOOK.md`
-- Organizer private release checklist: `organizer/private_release_checklist.md`
-- Judging day operations SOP: `organizer/JUDGING_DAY_SOP.md`
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[test,demo]"
+```
 
-## Data Source
+Download and extract the official [Participant Kit Release](https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit) once. Copy its frozen 50,000-product catalog into this repository:
 
-The catalog and sessions are derived from Amazon Reviews 2023 by McAuley Lab, UCSD. See `DATA_ATTRIBUTION.md` before using or redistributing the data.
-Sessions are sampled deterministically from the official Clothing 5-core leave-last-out split and joined to the frozen catalog.
+```powershell
+Copy-Item <participant-kit-directory>\data\catalog.jsonl data\catalog.jsonl
+```
+
+Validate its row count, identifiers, visible fields, and SHA256 without printing product records:
+
+```powershell
+uv run python scripts\inspect_catalog.py data\catalog.jsonl
+```
+
+The expected uncompressed SHA256 is `da979b05a68af864cb0dcf9ee6a81c010c7e66a57978ad286c7a2e005fc69a67`. `data/catalog.jsonl` is required locally but ignored by Git and must not be committed.
+
+## Test and evaluate
+
+```powershell
+uv run --extra test --extra demo python -m pytest
+uv run python -m evaluator.local_evaluator
+uv run python scripts\verify_official_files.py
+```
+
+The adapter resolves `src` with `pathlib.Path`, so an installed project also works with ordinary `python -m evaluator.local_evaluator`.
+
+## Run the optional demo
+
+Terminal 1:
+
+```powershell
+uv run --extra demo uvicorn demo.backend.app:app --host 127.0.0.1 --port 8000
+```
+
+Terminal 2:
+
+```powershell
+Set-Location frontend
+npm ci
+npm run dev -- --host 127.0.0.1
+```
+
+Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 product cards, a live Agent state/debug panel, and baseline/final evaluation metrics. It never participates in official evaluation.
+
+## Implemented
+
+- isolated `SessionState`, safe profile copies, deterministic reset semantics, and bounded diagnostics;
+- history-aware current/constraint/stable/profile retrieval routes;
+- Buying, Browsing, and Intent Override routing with conservative slot replacement;
+- no-preference/declined-attribute handling that does not contaminate queries;
+- in-memory SQLite FTS5, strict and broad retrieval tracks, weighted RRF, and bounded constraint-coverage reranking;
+- structured budget scoring, deterministic fallbacks, catalog membership validation, and deduplication;
+- clarification that does not repeat asked/declined attributes and always accompanies recommendations when candidates exist;
+- optional FastAPI session adapter and React demo using the same Agent instance contract.
+
+## Not implemented
+
+- dense embeddings or dense retrieval;
+- neural semantic reranking;
+- external LLM calls;
+- production authentication, commerce, inventory, or database services.
+
+## Limitations
+
+The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Intent Override remains the weakest evaluated class. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query/document caches.
+
+This repository excludes the catalog, secrets, virtual environments, caches, `results.json`, `node_modules`, and frontend build output.

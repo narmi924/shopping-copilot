@@ -29,6 +29,10 @@ class ClarificationPolicy:
     def choose(self, state: SessionState) -> str | None:
         order = self.ROUTE_ORDER.get(state.current_intent_route, self.ROUTE_ORDER["browsing"])
         active = {name for name, values in state.active_constraints.items() if values}
+        if state.current_intent_route == "override" and state.replacement_scope == "ambiguous":
+            for attribute in ("category", "other"):
+                if attribute not in state.asked_attributes and attribute not in state.declined_attributes:
+                    return attribute
         for attribute in order:
             if attribute in state.asked_attributes or attribute in state.declined_attributes:
                 continue

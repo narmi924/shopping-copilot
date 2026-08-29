@@ -29,11 +29,20 @@ class QueryBuilder:
             "stable": state.stable_context_terms(),
             "profile": state.profile_terms,
         }
-        return [
-            QueryRoute(name=name, terms=unique_terms(terms), weight=self.ROUTE_WEIGHTS[name])
+        weights = dict(self.ROUTE_WEIGHTS)
+        if state.current_intent_route == "override":
+            weights.update({"current": 6.0, "constraints": 3.2, "stable": 1.2, "profile": 0.20})
+        routes = [
+            QueryRoute(name=name, terms=unique_terms(terms), weight=weights[name])
             for name, terms in values.items()
             if terms
         ]
+        if state.current_intent_route == "override" and state.replacement_scope == "ambiguous":
+            for name, weight in (("hypothesis_attribute", 4.0), ("hypothesis_category", 2.6)):
+                terms = state.override_hypotheses.get(name.removeprefix("hypothesis_"), ())
+                if terms:
+                    routes.append(QueryRoute(name=name, terms=unique_terms(terms), weight=weight))
+        return routes
 
 
 @dataclass(slots=True)
@@ -45,7 +54,11 @@ class RetrievalOutcome:
 
 
 class MultiRouteLexicalRetriever:
-    def __init__(self, catalog: CatalogIndex, query_builder: QueryBuilder | None = None) -> None:
+    def __init__(
+        self,
+        catalog: CatalogIndex,
+        query_builder: QueryBuilder | None = None,
+    ) -> None:
         self.catalog = catalog
         self.query_builder = query_builder or QueryBuilder()
         self.reranker = ConstraintCoverageReranker(catalog)
@@ -97,13 +110,9 @@ class MultiRouteLexicalRetriever:
             }
 
         fused = weighted_reciprocal_rank_fusion(rankings, weights, limit=candidate_limit)
-        if use_precision_track:
-            reranked = self.reranker.rerank(fused, state, safe_top_k)
-            identifiers = [item.parent_asin for item in reranked]
-            ranking_scores = [(item.parent_asin, item.score) for item in reranked]
-        else:
-            identifiers = [item.parent_asin for item in fused[:safe_top_k]]
-            ranking_scores = [(item.parent_asin, item.score) for item in fused[:safe_top_k]]
+        reranked = self.reranker.rerank(fused, state, safe_top_k)
+        identifiers = [item.parent_asin for item in reranked]
+        ranking_scores = [(item.parent_asin, item.score) for item in reranked]
         if len(identifiers) < safe_top_k:
             combined_terms = unique_terms(
                 term

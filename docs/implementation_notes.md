@@ -18,7 +18,9 @@ The extractor uses general token dictionaries and regular expressions, never pub
 
 Threshold budgets are represented as structured constraints and scored against catalog price when a price exists. The highest-weight current-message route excludes the threshold number to avoid treating `$80` as a match for unrelated `80% nylon` text. Category evidence is checked primarily in title/category fields during reranking.
 
-Override handling is conservative: global reset language clears soft slots but retains stable product context; slot-level replacements clear only conflicting attributes. The replacement side receives the highest-weight current route. Removed constraints and replacement terms remain in internal state for tests and the optional debug panel, never in the official response.
+Override handling is slot-aware. General contrast forms such as `X instead of Y`, `Y rather than X`, `not X but Y`, `switch from X to Y`, `no longer X`, and `anything except X` are split into old/new clauses before extraction. Attribute changes clear only the affected slot. Category changes retain compatible budget/use-case context while clearing category-dependent size, style, brand, and feature slots. Explicitly rejected values receive bounded ranking penalties rather than unsafe hard exclusion.
+
+When replacement scope is genuinely ambiguous, the state keeps prior context and constructs two bounded hypotheses instead of erasing the conversation. Current-turn evidence has the highest override weight; stable context and profile evidence are reduced. Constraint status, confidence, source turn, superseded values, negatives, and replacement events remain internal state for tests and the optional debug panel, never the official response.
 
 ## Output guarantees
 
@@ -32,4 +34,4 @@ The browser QA pass covered session creation, a budget-constrained search, a sec
 
 ## Evaluation hygiene
 
-Only the unchanged evaluator reads public ground truth and simulator state. The Agent has no runtime path to labels or evaluator internals, contains no sample-specific rules, and never modifies or augments the catalog. The repository retains compact baseline and final metric summaries; the implementation uses the final generalized configuration described in `evaluation.md`.
+Only the unchanged evaluator reads public ground truth and simulator state. The Agent has no runtime path to labels or evaluator internals, contains no sample-specific rules, and never modifies or augments the catalog. The repository retains compact aggregate metric summaries. The current implementation is the smallest phase-two candidate that passed the documented public, synthetic, runtime, isolation, and invariant gates. The rejected semantic experiment and its generated index are not part of the runtime.

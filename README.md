@@ -8,22 +8,22 @@ The runtime calls no LLM, remote service, model, or production database. Product
 
 The unchanged official evaluator completed all 200 public sessions with zero model tokens.
 
-| Metric | Official baseline | Final offline Agent | Absolute change |
+| Metric | Official baseline | Current offline Agent | Absolute change |
 |---|---:|---:|---:|
-| Hit Rate@10 | 0.125000 | 0.835000 | +0.710000 |
-| MRR | 0.068034 | 0.515817 | +0.447783 |
-| MTTC (lower is better) | 9.810000 | 3.890000 | -5.920000 |
-| Efficiency | 0.119000 | 0.711000 | +0.592000 |
-| Recommended TechnicalScore | 0.106710 | 0.714445 | +0.607735 |
+| Hit Rate@10 | 0.125000 | 0.840000 | +0.715000 |
+| MRR | 0.068034 | 0.519359 | +0.451325 |
+| MTTC (lower is better) | 9.810000 | 3.865000 | -5.945000 |
+| Efficiency | 0.119000 | 0.713500 | +0.594500 |
+| Recommended TechnicalScore | 0.106710 | 0.718508 | +0.611798 |
 
-| Scenario | Baseline HR@10 | Final HR@10 | Change |
+| Scenario | Baseline HR@10 | Current HR@10 | Change |
 |---|---:|---:|---:|
 | Buying | 0.237500 | 0.937500 | +0.700000 |
 | Browsing | 0.025000 | 0.925000 | +0.900000 |
-| Intent Override | 0.133333 | 0.366667 | +0.233334 |
+| Intent Override | 0.133333 | 0.400000 | +0.266667 |
 | Boundary | 0.000000 | 0.700000 | +0.700000 |
 
-The final configuration favors general budget and override safeguards over selecting rules for one evaluation run. Reproduction details and the V1-to-final progression are recorded in [docs/evaluation.md](docs/evaluation.md).
+The current configuration favors general budget and replacement safeguards over selecting rules for one public evaluation run. It was selected using public aggregates, generic metamorphic tests, and a private catalog-derived stress benchmark intended to reduce public-set overfitting risk. That synthetic benchmark is not an organizer holdout and is not evidence of private-set performance. Reproduction details and the V1-to-current progression are recorded in [docs/evaluation.md](docs/evaluation.md).
 
 ## Project layout
 
@@ -36,7 +36,7 @@ shopping-copilot/
 ├── src/shopping_copilot/    state, intent, constraints, retrieval, policy
 ├── tests/                   fast temporary-catalog and API tests
 ├── scripts/                 catalog, hash, and result verification
-├── artifacts/metrics/       compact baseline and final metric summaries
+├── artifacts/metrics/       compact baseline and current metric summaries
 ├── demo/backend/            optional thin FastAPI adapter
 └── frontend/                optional React + Vite + Ant Design demo
 ```
@@ -65,10 +65,33 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -e ".[test,demo]"
 ```
 
-Download and extract the official [Participant Kit Release](https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit) once. Copy its frozen 50,000-product catalog into this repository:
+Download `catalog.jsonl.gz` and `SHA256SUMS` from the official [Participant Kit Release](https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit):
 
 ```powershell
-Copy-Item <participant-kit-directory>\data\catalog.jsonl data\catalog.jsonl
+$release = "https://github.com/TechJam2026/techjam-conversational-search/releases/download/participant-kit"
+Invoke-WebRequest "$release/catalog.jsonl.gz" -OutFile data\catalog.jsonl.gz
+Invoke-WebRequest "$release/SHA256SUMS" -OutFile data\SHA256SUMS
+
+$checksumLine = @(Get-Content data\SHA256SUMS | Where-Object { $_ -match "catalog\.jsonl\.gz$" })
+if ($checksumLine.Count -ne 1) { throw "catalog.jsonl.gz checksum entry not found" }
+$expected = ($checksumLine[0] -split "\s+")[0].ToLowerInvariant()
+$actual = (Get-FileHash data\catalog.jsonl.gz -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "catalog.jsonl.gz checksum mismatch" }
+```
+
+After the checksum passes, decompress the catalog with the Python standard library:
+
+```powershell
+@'
+import gzip
+import shutil
+from pathlib import Path
+
+source = Path("data/catalog.jsonl.gz")
+target = Path("data/catalog.jsonl")
+with gzip.open(source, "rb") as compressed, target.open("wb") as output:
+    shutil.copyfileobj(compressed, output)
+'@ | uv run python -
 ```
 
 Validate its row count, identifiers, visible fields, and SHA256 without printing product records:
@@ -105,13 +128,14 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 product cards, a live Agent state/debug panel, and baseline/final evaluation metrics. It never participates in official evaluation.
+Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 product cards, a live Agent state/debug panel, and baseline/current evaluation metrics. It never participates in official evaluation.
 
 ## Implemented
 
 - isolated `SessionState`, safe profile copies, deterministic reset semantics, and bounded diagnostics;
 - history-aware current/constraint/stable/profile retrieval routes;
-- Buying, Browsing, and Intent Override routing with conservative slot replacement;
+- Buying, Browsing, and Intent Override routing with slot-aware attribute/category replacement;
+- explicit negative constraints, constraint provenance, and bounded dual hypotheses for ambiguous overrides;
 - no-preference/declined-attribute handling that does not contaminate queries;
 - in-memory SQLite FTS5, strict and broad retrieval tracks, weighted RRF, and bounded constraint-coverage reranking;
 - structured budget scoring, deterministic fallbacks, catalog membership validation, and deduplication;
@@ -127,6 +151,6 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 
 ## Limitations
 
-The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Intent Override remains the weakest evaluated class. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query/document caches.
+The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Intent Override remains the weakest public scenario despite the phase-two gain. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query/document caches.
 
 This repository excludes the catalog, secrets, virtual environments, caches, `results.json`, `node_modules`, and frontend build output.

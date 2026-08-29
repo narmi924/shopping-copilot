@@ -6,6 +6,8 @@ The official evaluator, public set, API contract, and evaluation config were cop
 
 The frozen catalog passed a full structural and integrity scan: 50,000 valid JSON objects, 50,000 non-empty unique `parent_asin` values, zero duplicates, all participant-visible fields present, and the expected official SHA256. No alternate catalog is merged into it.
 
+Missing files, malformed JSON, missing identifiers, duplicate identifiers, and a Python build without SQLite FTS5 fail during construction with a concise error before a session starts. No partial index is used as a fallback.
+
 ## Deterministic core
 
 The evaluator/core uses only the Python standard library. SQLite FTS5 uses the Porter/unicode61 tokenizer and deterministic BM25 ordering with `parent_asin` as the final tie-break. Weighted RRF, constraint reranking, cache eviction, clarification, and popularity fallback have no random component.
@@ -48,7 +50,7 @@ The earlier ranking path remains available as a lexical control mode. It uses th
 
 FastAPI is an optional thin adapter. It lazily creates the same Agent core, serializes access with an `RLock`, maintains isolated demo sessions, and enriches catalog-valid identifiers for product cards. React uses only the public demo endpoints. Neither layer is imported by `starter.agent` or required by the evaluator.
 
-The browser QA pass covered session creation, a budget-constrained search, a second-turn intent override, live debug state, product enrichment, session reset, metrics rendering, navigation, and console errors. Runtime screenshots/reports are stored under ignored `artifacts/runtime/`.
+The browser QA pass covers session creation, a multi-turn product search, a second-turn intent override, live constraint/evidence/question/portfolio state, product enrichment, session reset, metrics rendering, navigation, and console errors. Runtime screenshots and reports are stored outside the public repository.
 
 ## Evaluation hygiene
 

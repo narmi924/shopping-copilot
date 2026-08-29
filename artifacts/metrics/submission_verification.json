@@ -1,0 +1,55 @@
+{
+  "verification": "submission_hardening",
+  "algorithm_commit": "75a51f240ed6421da7188ca43b2d0752fbbbbd52",
+  "algorithm_tag": "submission-candidate-1",
+  "default_policy": "protocol_evidence",
+  "fallback_policy": "phase3",
+  "official_public_evaluator": {
+    "sample_count": 200,
+    "hits": 188,
+    "hit_rate_at_10": 0.94,
+    "mrr": 0.645704,
+    "mttc": 3.985,
+    "efficiency": 0.7015,
+    "recommended_technical_score": 0.804011,
+    "model_tokens": 0,
+    "scenario_metrics": {
+      "buying": {"hits": 76, "sample_count": 80, "mrr": 0.622634},
+      "browsing": {"hits": 77, "sample_count": 80, "mrr": 0.664474},
+      "intent_override": {"hits": 25, "sample_count": 30, "mrr": 0.637037},
+      "boundary": {"hits": 10, "sample_count": 10, "mrr": 0.706111}
+    }
+  },
+  "runtime": {
+    "canonical_evaluator_wall_seconds": 70.288,
+    "canonical_peak_process_tree_mib": 642.07,
+    "windows_clean_room_wall_seconds": 72.25,
+    "windows_clean_room_peak_process_tree_mib": 674.594,
+    "hardening_verification_wall_seconds": 84.797,
+    "cold_agent_construction_seconds": 7.273538,
+    "catalog_and_fts5_build_seconds": 2.73074,
+    "evidence_build_seconds": 4.541267,
+    "evidence_keys": 228307,
+    "evidence_postings": 527885,
+    "evidence_lookup_p50_ms": 0.0335,
+    "evidence_lookup_p95_ms": 1.4016
+  },
+  "checks": {
+    "pytest_passed": 78,
+    "pytest_failed": 0,
+    "frontend_build": "passed",
+    "browser_smoke": "passed",
+    "windows_clean_room": "passed",
+    "linux_runtime_smoke": "passed_with_documented_network_deviation",
+    "runtime_network_calls": 0,
+    "external_service_cost_usd": 0
+  },
+  "sha256": {
+    "evaluator/local_evaluator.py": "79a5ea06f9a1b8c5036f30efa85dc1f36b8f6b06eb8feb8f545dfa767bc45564",
+    "data/public_set.jsonl": "857259f7a438e6188ac63e18995b6ff4489bfcfc4a716a798b9a2aa0ee8f7579",
+    "docs/official/agent_api_contract.json": "635563741dd71c273d540722913eccdc595b4af9b47ade79f38cd42ae45c8822",
+    "docs/official/evaluation_config.json": "8ee0c899ddc68d521754cf9d2f239a8bc09851fb37c5872567160c30d431aa53",
+    "data/catalog.jsonl": "da979b05a68af864cb0dcf9ee6a81c010c7e66a57978ad286c7a2e005fc69a67",
+    "data/catalog.jsonl.gz": "07fd142631fd6b03e2b4d09988c3eb7d53720e9d57010c79db48eeaada50a8f8"
+  }
+}

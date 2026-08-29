@@ -54,6 +54,8 @@ const SOURCE_LABELS: Record<string, string> = {
   stable: "Shopping context",
   stable_context: "Shopping context",
   profile: "Profile hints",
+  evidence: "Exact catalog evidence",
+  strict: "All-term precision",
 };
 
 function humanize(value: string | null | undefined): string {
@@ -165,8 +167,15 @@ function ContextDrawer({
 
       {(debug?.declined_attributes.length ?? 0) > 0 && (
         <section className="drawer-section">
-          <span className="drawer-label">Declined attributes</span>
+          <span className="drawer-label">No preference</span>
           <p>{debug?.declined_attributes.map(humanize).join(", ")}</p>
+        </section>
+      )}
+
+      {(debug?.exhausted_attributes.length ?? 0) > 0 && (
+        <section className="drawer-section">
+          <span className="drawer-label">No additional preference</span>
+          <p>{debug?.exhausted_attributes.map(humanize).join(", ")}</p>
         </section>
       )}
 
@@ -188,6 +197,19 @@ function ContextDrawer({
         </section>
       )}
 
+      {(debug?.negative_constraints.length ?? 0) > 0 && (
+        <section className="drawer-section">
+          <span className="drawer-label">Excluded preferences</span>
+          <div className="superseded-list">
+            {debug?.negative_constraints.map((item, index) => (
+              <span key={`${item.attribute}-${item.value}-${index}`}>
+                {humanize(item.attribute)}: {item.value}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
       <details className="technical-details">
         <summary>Technical details</summary>
         {debug ? (
@@ -201,10 +223,41 @@ function ContextDrawer({
               {Object.entries(debug.retrieval_sources).map(([name, source]) => (
                 <div className="source-row" key={name}>
                   <span>{SOURCE_LABELS[name] ?? humanize(name)}</span>
-                  <small>{source.candidate_count} candidates</small>
+                  <small>
+                    {source.candidate_count} candidates
+                    {source.mode === "exact-evidence" ? " · exact match" : ""}
+                  </small>
                 </div>
               ))}
             </div>
+            {debug.question_value?.attribute && (
+              <div className="source-list">
+                <span className="drawer-label">Selected question</span>
+                <div className="technical-stat">
+                  <span>{humanize(debug.question_value.attribute)}</span>
+                  <strong>{(debug.question_value.score ?? 0).toFixed(3)}</strong>
+                </div>
+                {Object.entries(debug.question_value.factors ?? {}).map(([name, value]) => (
+                  <div className="source-row" key={name}>
+                    <span>{humanize(name)}</span>
+                    <small>{value.toFixed(3)}</small>
+                  </div>
+                ))}
+              </div>
+            )}
+            {(debug.candidate_portfolio?.precision_count ?? 0) > 0 && (
+              <div className="source-list">
+                <span className="drawer-label">Top 10 allocation</span>
+                <div className="source-row">
+                  <span>Precision core</span>
+                  <small>{debug.candidate_portfolio.precision_count ?? 0} slots</small>
+                </div>
+                <div className="source-row">
+                  <span>Exploration tail</span>
+                  <small>{debug.candidate_portfolio.exploration_count ?? 0} slots</small>
+                </div>
+              </div>
+            )}
             <div className="ranking-list">
               <span className="drawer-label">Top ranking scores</span>
               {debug.final_ranking_scores.slice(0, 5).map((item, index) => (

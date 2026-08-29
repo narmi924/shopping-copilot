@@ -13,23 +13,48 @@ export interface ProductRecommendation {
 export interface RetrievalSource {
   weight: number;
   candidate_count: number;
-  mode: "any-term" | "all-terms";
-  terms: string[];
+  mode: "any-term" | "all-terms" | "exact-evidence";
+  terms?: string[];
+  clause_count?: number;
+}
+
+export interface ConstraintSummary {
+  attribute: string;
+  value: string;
+}
+
+export interface QuestionValueDebug {
+  attribute?: string | null;
+  score?: number;
+  factors?: Record<string, number>;
+  alternatives?: Array<{ attribute: string; score: number }>;
+}
+
+export interface CandidatePortfolioDebug {
+  precision_count?: number;
+  exploration_count?: number;
+  considered_count?: number;
 }
 
 export interface DebugSnapshot {
   session_id: string;
   detected_route: "buying" | "browsing" | "override";
   active_constraints: Record<string, string[]>;
-  superseded_constraints: Array<{ attribute: string; value: string }>;
+  superseded_constraints: ConstraintSummary[];
+  negative_constraints: ConstraintSummary[];
   asked_attributes: string[];
   declined_attributes: string[];
+  exhausted_attributes: string[];
   last_asked_attribute: string | null;
   candidate_count: number;
   retrieval_sources: Record<string, RetrievalSource>;
   final_ranking_scores: Array<{ parent_asin: string; score: number }>;
   override_count: number;
   turn_count: number;
+  policy_mode: string;
+  question_value: QuestionValueDebug;
+  candidate_portfolio: CandidatePortfolioDebug;
+  evidence_index: Record<string, unknown>;
 }
 
 export interface TurnResponse {

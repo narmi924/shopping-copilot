@@ -42,6 +42,14 @@ def test_empty_message_and_unknown_profile_fields_do_not_crash(agent) -> None:
     assert len(response["recommendations"]) <= 10
 
 
+def test_invalid_turn_and_top_k_values_are_normalized(agent) -> None:
+    agent.reset("session", {})
+    response = agent.respond("session", "desk lamp", None, "not-a-number")
+
+    assert response["recommendations"] == []
+    assert agent.get_state("session").turn_history[-1].turn == 1
+
+
 def test_debug_snapshot_is_internal_and_presentation_safe(agent) -> None:
     agent.reset("session", {})
     response = agent.respond("session", "I need red cotton running shoes.", 1, 3)

@@ -72,11 +72,19 @@ class CatalogIndex:
 
     def _build(self) -> None:
         cursor = self._connection.cursor()
-        cursor.execute(
-            "CREATE VIRTUAL TABLE products USING fts5("
-            "parent_asin UNINDEXED, title, categories, features, details, store, description, price, "
-            "tokenize='porter unicode61 remove_diacritics 2')"
-        )
+        try:
+            cursor.execute(
+                "CREATE VIRTUAL TABLE products USING fts5("
+                "parent_asin UNINDEXED, title, categories, features, details, store, description, price, "
+                "tokenize='porter unicode61 remove_diacritics 2')"
+            )
+        except sqlite3.OperationalError as exc:
+            if "fts5" in str(exc).lower():
+                self._connection.close()
+                raise RuntimeError(
+                    "SQLite FTS5 support is required to build the catalog index"
+                ) from exc
+            raise
         products: dict[str, ProductRecord] = {}
         batch: list[tuple[str, str, str, str, str, str, str, str]] = []
         with self.catalog_path.open("r", encoding="utf-8") as handle:

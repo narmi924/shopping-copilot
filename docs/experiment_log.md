@@ -206,3 +206,13 @@ The three paired 800-session exact-policy seeds increased mean TechnicalScore fr
 The accepted official run completed in 70.288 seconds with a 642.070 MiB approximate peak working set. Buying MRR recovered from 0.528309 to 0.622634, public MTTC fell by 0.415 turns, all four scenario hit counts were preserved or improved, all 73 tests passed, and the protected assets remained byte-identical.
 
 Decision: accept the protocol-evidence configuration and keep `phase3` as a selectable deterministic fallback. A third `other` question, a separate Buying rank branch, and incomplete-feedback combinations were removed.
+
+## 2026-08-29 — Submission hardening verification
+
+The algorithm and default policy remained frozen at public commit `75a51f240ed6421da7188ca43b2d0752fbbbbd52`. Hardening added standalone checksum clarity, resource and disclosure documentation, presentation-safe Phase 4 diagnostics in the optional demo, explicit catalog/FTS failure tests, and a readable error when Python lacks SQLite FTS5. No retrieval, ranking, dialogue-policy, constraint, or evidence-scoring rule changed.
+
+A fresh Windows clone downloaded and verified both official catalog assets, installed from the public README, passed 73/73 pre-hardening tests, and reproduced every official aggregate metric exactly. Its evaluator took 72.250 seconds with a 674.594 MiB sampled peak process-tree working set. An Ubuntu/WSL Python 3.12.3 smoke check verified checksums, FTS5, catalog construction, protected hashes, reset/respond, identifier uniqueness, and zero token usage; direct WSL GitHub access was unavailable, so the fresh clone and release download were prepared on Windows before Linux execution.
+
+The final hardening tree passed 78 tests, catalog inspection, all four protected hashes, the frontend production build, a real browser smoke test, and `git diff --check`. The final evaluator again produced 188/200, HR@10 0.940000, MRR 0.645704, MTTC 3.985000, Efficiency 0.701500, and TechnicalScore 0.804011. That system-load run took 84.797 seconds and is retained separately from the canonical 70.288-second result.
+
+Decision: retain the frozen `protocol_evidence` algorithm. Accept only reproducibility, auditability, failure-message, documentation, and optional-demo hardening.

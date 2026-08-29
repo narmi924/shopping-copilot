@@ -4,29 +4,34 @@ Shopping Copilot is a deterministic local pipeline. The official entry point rem
 
 ```mermaid
 flowchart LR
-    E[Evaluator] --> A[starter.Agent adapter]
-    A --> X[Constraint and Contrast Parser]
-    X --> S[Constraint Ledger and State Reducer]
-    S --> I[Intent Router]
-    I --> Q[Query Builder]
-    Q --> L[Multi-route Lexical Retrieval]
-    S --> ER[Evidence Fingerprint Retrieval]
-    L --> R[Weighted RRF]
-    ER --> R
-    R --> CR[Constraint Coverage Reranker]
-    CR --> CP[Bounded Candidate Pool]
-    CP --> V[Question Value Estimator]
-    CP --> T[Adaptive Top-10 Portfolio]
-    F[Read-only Candidate Facets] --> V
-    F --> T
-    V --> O[Agent Response]
-    T --> O
+    subgraph BOUNDARY[Official evaluator boundary]
+        E[Evaluator] --> A[starter.Agent adapter]
+        A --> X[Constraint and Contrast Parser]
+        X --> I[Intent Router]
+        I --> S[Constraint Ledger<br/>isolated per session]
+        S --> Q[Multi-route Query Builder]
+        Q --> L[Lexical current / active / stable / profile]
+        S --> ER[Catalog Evidence Retrieval]
+        L --> R[Weighted RRF]
+        ER --> R
+        R --> CR[Constraint-Aware Reranker]
+        CR --> CP[Bounded Candidate Pool]
+        CP --> V[Question Value Estimator]
+        CP --> T[Adaptive Top-10 Portfolio]
+        V --> O[message + ask_attribute]
+        T --> O2[ranked parent_asin]
+    end
 
-    K[(Read-only frozen catalog)] --> L
-    K --> ER
-    K --> CR
-    K --> F
-    P[Safe anonymized profile fields] --> Q
+    K[(Frozen read-only catalog)] --> FTS[In-memory SQLite FTS5]
+    K --> ERI[Evidence Fingerprint Index]
+    K --> F[Read-only Candidate Facets]
+    FTS --> L
+    ERI --> ER
+    F --> V
+    F --> T
+    P[Anonymous preference_tags + summary] --> Q
+    FB[phase3 deterministic fallback] -. selectable policy .-> S
+    N[No network<br/>zero model tokens] --- A
 
     UI[React UI] -. optional .-> API[Thin FastAPI adapter]
     API -. same core .-> A

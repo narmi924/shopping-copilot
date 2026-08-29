@@ -29,7 +29,7 @@ npm run dev -- --host 127.0.0.1
 
 Open `http://127.0.0.1:5173`. Vite proxies `/api` to the local service.
 
-The API owns presentation session IDs and serializes access to one lazily loaded Agent. Product card metadata is read from the same immutable catalog. The default UI is customer-facing: conversation, current turn, the attribute being refined, active shopping context, and the ranked shortlist stay visible. Candidate counts, retrieval sources, ranking scores, and benchmark comparisons are available through deliberate disclosures instead of occupying the shopping workspace. Debug output contains only participant-owned state and retrieval scores; evaluator labels and private state are never exposed.
+The API owns presentation session IDs and serializes access to one lazily loaded Agent. Product card metadata is read from the same immutable catalog. The default UI is customer-facing: conversation, current turn, the attribute being refined, active shopping context, and the ranked shortlist stay visible. The on-demand context drawer distinguishes active, superseded, negative, declined, and exhausted state; it also shows the selected question's bounded factors, exact-evidence contribution, candidate count, ranking scores, and precision/exploration allocation. Benchmark comparisons remain in a separate modal instead of occupying the shopping workspace. Debug output contains only participant-owned state and presentation-safe retrieval scores; evaluator labels, raw catalog records, and private experiment data are never exposed.
 
 Useful endpoints:
 

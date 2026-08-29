@@ -58,6 +58,22 @@ def test_demo_health_session_turn_and_debug(catalog_path, tmp_path) -> None:
     assert payload["recommendations"][0]["title"]
     assert payload["debug"]["detected_route"] == "buying"
     assert payload["debug"]["retrieval_sources"]
+    assert "negative_constraints" in payload["debug"]
+    assert "exhausted_attributes" in payload["debug"]
+    assert payload["debug"]["question_value"]["attribute"] == payload["ask_attribute"]
+    assert payload["debug"]["candidate_portfolio"]["precision_count"] > 0
+
+    evidence_turn = client.post(
+        f"/api/sessions/{session_id}/turns",
+        json={
+            "message": "For that, what matters is: breathable cotton upper.",
+            "top_k": 3,
+        },
+    )
+    assert evidence_turn.status_code == 200
+    evidence_source = evidence_turn.json()["debug"]["retrieval_sources"]["evidence"]
+    assert evidence_source["mode"] == "exact-evidence"
+    assert evidence_source["candidate_count"] == 1
 
     metrics = client.get("/api/metrics")
     assert metrics.status_code == 200

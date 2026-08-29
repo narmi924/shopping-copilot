@@ -257,6 +257,24 @@ A separate 400-session empty-profile slice rose from 363 to 370 hits, MRR 0.5671
 
 The frozen official run completed in 70.288 seconds, 1.090 times the 64.473-second control rerun, with an approximate 642.070 MiB peak working set and zero model tokens. All 73 tests passed.
 
+## Independent submission reproduction
+
+A fresh Windows clone of public commit `75a51f240ed6421da7188ca43b2d0752fbbbbd52` was prepared using only this README and the official release assets. The compressed checksum was `07fd142631fd6b03e2b4d09988c3eb7d53720e9d57010c79db48eeaada50a8f8`; the decompressed catalog matched the expected `da979b05...fc69a67` checkpoint. Installation, catalog inspection, protected-file verification, all 73 tests, and the complete evaluator passed without a parent workspace or machine-specific project path. The clean-room evaluator reproduced every aggregate metric exactly in 72.250 seconds with an approximately 674.594 MiB sampled peak process-tree working set.
+
+An Ubuntu/WSL smoke run used Python 3.12.3 and its native SQLite FTS5 implementation. It independently verified both catalog checksums, catalog structure, all four protected hashes, cold index construction, session reset, one real response, identifier uniqueness, and zero token usage. WSL's direct GitHub connection was unavailable during that check, so a second fresh public clone and the official release downloads were prepared by Windows Git/PowerShell before Linux execution; this portability result is a runtime smoke test rather than a fully network-independent Linux clean-room reproduction.
+
+| Resource | Measured value |
+|---|---:|
+| Cold Agent construction | 7.274 s |
+| Catalog load + in-memory FTS5 build | 2.731 s |
+| Evidence Fingerprint build | 4.541 s |
+| Evidence keys / postings | 228,307 / 527,885 |
+| Evidence lookup p50 / p95 (1,000 queries) | 0.0335 ms / 1.4016 ms |
+| Core runtime network calls | 0 |
+| External-service cost | $0 |
+
+After adding only failure-message, documentation, and presentation hardening, the suite increased to 78 passing tests. A final complete evaluator rerun reproduced all aggregate and scenario metrics exactly. It took 84.797 seconds under the then-current system load; this run is recorded separately rather than replacing the canonical or clean-room resource figures.
+
 ## Interpretation
 
 The public control failure analysis found that 32 of 33 missed targets entered a

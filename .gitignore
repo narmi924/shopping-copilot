@@ -1,5 +1,6 @@
 data/catalog.jsonl
 data/catalog.jsonl.gz
+data/SHA256SUMS
 results.json
 .venv/
 **/__pycache__/

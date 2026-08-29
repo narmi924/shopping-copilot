@@ -1,6 +1,4 @@
 data/public_set.jsonl -text
 evaluator/local_evaluator.py -text
-docs/agent_api_contract.json -text
-docs/evaluation_config.json -text
 docs/official/agent_api_contract.json -text
 docs/official/evaluation_config.json -text

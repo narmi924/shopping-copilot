@@ -1,7 +1,6 @@
 data/catalog.jsonl
 data/catalog.jsonl.gz
 results.json
-
 .venv/
 **/__pycache__/
 *.py[cod]
@@ -9,14 +8,14 @@ results.json
 .ruff_cache/
 .mypy_cache/
 .coverage
-
 artifacts/runtime/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 frontend/.vite/
 frontend/*.tsbuildinfo
-
+frontend/vite.config.js
+frontend/vite.config.d.ts
 *.log
 .env
 .env.*

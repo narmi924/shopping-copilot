@@ -1,13 +1,15 @@
-# Competition Data
+# Local evaluation data
 
-## `public_set.jsonl`
+`public_set.jsonl` is copied byte-for-byte from the official Participant Kit and is intentionally versioned for local evaluation.
 
-Contains 200 labeled development sessions: 80 Buying, 80 Browsing, 30 Intent Override, and 10 Boundary sessions.
+Download and extract the official [Participant Kit Release](https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit), then copy its `data/catalog.jsonl` into this directory. The download is a one-time setup step; this project does not fetch data during installation or evaluation.
 
-Each session contains a safe aggregate `user_profile` and public labels for local development. Direct user identifiers, timestamps, free-text reviews, raw purchase history, hidden intent cards, and simulator-policy internals are not shipped in this participant file.
+Verify the local file from the repository root:
 
-## `catalog.jsonl`
+```powershell
+uv run python scripts\inspect_catalog.py data\catalog.jsonl
+```
 
-Download `catalog.jsonl.gz` from the GitHub Release and decompress it as `catalog.jsonl` in this directory. Expected row count: 50,000.
+The validator expects 50,000 unique product identifiers and the official uncompressed SHA256 `da979b05a68af864cb0dcf9ee6a81c010c7e66a57978ad286c7a2e005fc69a67`. It exits without printing product records if validation fails.
 
-Never place API keys, private evaluation data, or participant outputs in this directory.
+`catalog.jsonl` and `catalog.jsonl.gz` are ignored by Git. Do not commit or redistribute them from this repository.

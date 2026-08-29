@@ -106,6 +106,14 @@ class Agent:
                 {"attribute": constraint.attribute, "value": constraint.value}
                 for constraint in state.superseded_constraints
             ],
+            "negative_constraints": [
+                {"attribute": constraint.attribute, "value": constraint.value}
+                for constraint in state.negative_constraints
+            ],
+            "current_turn_constraints": [
+                {"attribute": constraint.attribute, "value": constraint.value}
+                for constraint in state.current_turn_constraints
+            ],
             "asked_attributes": sorted(state.asked_attributes),
             "declined_attributes": sorted(state.declined_attributes),
             "last_asked_attribute": state.last_asked_attribute,
@@ -116,5 +124,7 @@ class Agent:
                 for identifier, score in state.last_ranking_scores
             ],
             "override_count": state.override_count,
+            "replacement_scope": state.replacement_scope,
+            "override_confidence": round(state.override_confidence, 3),
             "turn_count": len(state.turn_history),
         }

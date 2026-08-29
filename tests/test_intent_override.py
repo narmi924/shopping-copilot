@@ -102,3 +102,120 @@ def test_attribute_override_keeps_generic_category_context(agent) -> None:
     assert "shoes" in state.stable_category_terms
     assert "blue" in state.active_constraint_terms()
     assert "red" not in state.active_constraint_terms()
+
+
+def test_not_but_records_negative_constraint(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need red cotton shoes.", 1, 4)
+    agent.respond("session", "Not red but blue.", 2, 4)
+    state = agent.get_state("session")
+
+    assert "blue" in state.active_constraint_terms()
+    assert "red" not in state.active_constraint_terms()
+    assert any(item.attribute == "color" and "red" in item.terms for item in state.negative_constraints)
+    assert state.override_events[-1].replacement_type == "attribute"
+    assert state.override_confidence >= 0.9
+
+
+def test_category_switch_retains_budget_and_clears_dependent_slots(agent) -> None:
+    agent.reset("session", {})
+    agent.respond(
+        "session",
+        "I need a black wool coat in size medium, formal style, under $100.",
+        1,
+        4,
+    )
+    agent.respond(
+        "session",
+        "Switch from coats to blue leather walking shoes.",
+        2,
+        4,
+    )
+    state = agent.get_state("session")
+
+    assert state.replacement_scope == "category"
+    assert "budget" in state.active_constraints
+    assert "size" not in state.active_constraints
+    assert "style" not in state.active_constraints
+    assert "coat" not in state.stable_category_terms
+    assert "shoes" in state.stable_category_terms
+
+
+def test_ambiguous_override_builds_two_deterministic_hypotheses(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need red cotton shoes.", 1, 4)
+    first = agent.respond("session", "Actually, what I need is extra cushioning.", 2, 4)
+    first_debug = agent.debug_snapshot("session")
+
+    agent.reset("session", {})
+    agent.respond("session", "I need red cotton shoes.", 1, 4)
+    second = agent.respond("session", "Actually, what I need is extra cushioning.", 2, 4)
+    second_debug = agent.debug_snapshot("session")
+
+    assert first_debug["replacement_scope"] == "ambiguous"
+    assert {"hypothesis_attribute", "hypothesis_category"} <= set(first_debug["retrieval_sources"])
+    assert first["recommendations"] == second["recommendations"]
+    assert first_debug["retrieval_sources"] == second_debug["retrieval_sources"]
+
+
+def test_chained_overrides_keep_only_latest_color_active(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need red cotton shoes.", 1, 4)
+    agent.respond("session", "I prefer blue rather than red.", 2, 4)
+    agent.respond("session", "Switch from blue to green.", 3, 4)
+    state = agent.get_state("session")
+
+    color_terms = {
+        term
+        for item in state.active_constraints.get("color", [])
+        for term in item.terms
+    }
+    assert color_terms == {"green"}
+    assert {"red", "blue"} <= set(state.negative_constraint_terms())
+
+
+def test_no_preference_after_override_clears_only_that_slot(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need red cotton shoes.", 1, 4)
+    agent.respond("session", "Blue rather than red, please.", 2, 4)
+    agent.respond("session", "I don't have a preference for color.", 3, 4)
+    state = agent.get_state("session")
+
+    assert "color" in state.declined_attributes
+    assert "color" not in state.active_constraints
+    assert "cotton" in state.active_constraint_terms()
+    assert not any(item.attribute == "color" for item in state.negative_constraints)
+
+
+def test_override_after_no_preference_reactivates_slot(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need cotton shoes.", 1, 4)
+    agent.respond("session", "I don't have a preference for color.", 2, 4)
+    agent.respond("session", "Actually, choose blue instead of red.", 3, 4)
+    state = agent.get_state("session")
+
+    assert "color" not in state.declined_attributes
+    assert "blue" in state.active_constraint_terms()
+    assert "red" not in state.active_constraint_terms()
+
+
+def test_rather_than_without_leading_verb_is_an_override(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need red cotton shoes.", 1, 4)
+    agent.respond("session", "Blue rather than red, please.", 2, 4)
+    state = agent.get_state("session")
+
+    assert state.current_intent_route == "override"
+    assert "blue" in state.active_constraint_terms()
+    assert "red" not in state.active_constraint_terms()
+
+
+def test_no_longer_without_replacement_becomes_negative(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need red cotton shoes.", 1, 4)
+    agent.respond("session", "I no longer want red.", 2, 4)
+    state = agent.get_state("session")
+
+    assert "red" not in state.active_constraint_terms()
+    assert "red" in state.negative_constraint_terms()
+    assert state.replacement_scope == "negative"

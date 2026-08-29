@@ -50,6 +50,21 @@ class Constraint:
     value: str
     terms: tuple[str, ...]
     source_turn: int
+    status: str = "active"
+    confidence: float = 1.0
+    origin: str = "dialogue"
+
+
+@dataclass(frozen=True, slots=True)
+class Replacement:
+    """Structured interpretation of an explicit preference replacement."""
+
+    old_clause: str
+    new_clause: str
+    affected_slots: tuple[str, ...]
+    replacement_type: str
+    confidence: float
+    ambiguous: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +82,9 @@ class OverrideEvent:
     user_message: str
     superseded: tuple[Constraint, ...]
     replacement_terms: tuple[str, ...]
+    negative: tuple[Constraint, ...] = ()
+    replacement_type: str = "ambiguous"
+    confidence: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +99,8 @@ class ConstraintExtraction:
     constraints: list[Constraint] = field(default_factory=list)
     category_terms: tuple[str, ...] = ()
     retrieval_terms: tuple[str, ...] = ()
+    negative_constraints: list[Constraint] = field(default_factory=list)
+    replacement: Replacement | None = None
     declined_attributes: set[str] = field(default_factory=set)
     decline_only: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)

@@ -31,3 +31,14 @@ def test_explicit_color_decline_clears_old_color_constraint(agent) -> None:
     assert "color" in state.declined_attributes
     assert "color" not in state.active_constraints
     assert "red" not in state.active_constraint_terms()
+
+
+def test_indifferent_attribute_is_treated_as_declined(agent) -> None:
+    agent.reset("session", {})
+    agent.respond("session", "I need blue leather walking shoes.", 1, 4)
+    response = agent.respond("session", "I'm indifferent to color.", 2, 4)
+    state = agent.get_state("session")
+
+    assert "color" in state.declined_attributes
+    assert "leather" in state.active_constraint_terms()
+    assert response["ask_attribute"] != "color"

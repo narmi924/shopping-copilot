@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from .models import Constraint, ConstraintExtraction
+from .models import Constraint, ConstraintExtraction, Replacement
 from .text import (
     extract_category_terms,
     find_declined_attributes,
@@ -40,9 +40,14 @@ OVERRIDE_MARKERS = (
     re.compile(r"\binstead\b", re.IGNORECASE),
     re.compile(r"\bchanged?\s+my\s+mind\b", re.IGNORECASE),
     re.compile(r"\bignore\s+(?:all\s+)?(?:of\s+)?my\s+(?:earlier|previous|prior)\b", re.IGNORECASE),
-    re.compile(r"\bwhat\s+i\s+(?:really\s+)?need\s+is\b", re.IGNORECASE),
-    re.compile(r"\bno\s+longer\s+(?:want|need|prefer)\b", re.IGNORECASE),
-    re.compile(r"\bprefer\b.+\brather\s+than\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+i\s+(?:(?:actually|really)\s+)?need\s+is\b", re.IGNORECASE),
+    re.compile(r"\bno\s+longer\b", re.IGNORECASE),
+    re.compile(r"\b(?:prefer|choose|want|need)\b.+\b(?:rather|better)\s+than\b", re.IGNORECASE),
+    re.compile(r"\bnot\b.+\bbut\b", re.IGNORECASE),
+    re.compile(r"\bswitch\s+from\b.+\bto\b", re.IGNORECASE),
+    re.compile(r"\banything\s+except\b", re.IGNORECASE),
+    re.compile(r"\bforget\b", re.IGNORECASE),
+    re.compile(r"\b(?:rather|better)\s+than\b", re.IGNORECASE),
 )
 
 GLOBAL_OVERRIDE_RE = re.compile(
@@ -75,7 +80,7 @@ def _replacement_segment(text: str) -> str:
 
     normalized = normalize_whitespace(text)
     patterns = (
-        re.compile(r"\bwhat\s+i\s+(?:really\s+)?need\s+is\s*:\s*(.+)$", re.I),
+        re.compile(r"\bwhat\s+i\s+(?:(?:actually|really)\s+)?need\s+is\s*:?\s*(.+)$", re.I),
         re.compile(r"\bprefer\s+(.+?)\s+rather\s+than\s+.+$", re.I),
         re.compile(r"\b(?:want|need)\s+(.+?)\s+instead\s+of\s+.+$", re.I),
         re.compile(r"\binstead\s*[,;:]?\s*(?:i\s+)?(?:would\s+)?(?:prefer|want|need)?\s*(.+)$", re.I),
@@ -87,6 +92,77 @@ def _replacement_segment(text: str) -> str:
         if match and match.group(1).strip(" -;,."):
             return match.group(1).strip(" -;,.")
     return normalized
+
+
+def _clean_clause(value: str) -> str:
+    cleaned = normalize_whitespace(value).strip(" -;,.:")
+    cleaned = re.sub(
+        r"^(?:actually\s*[,;:]?\s*|i(?:'ve|\s+have)?\s+changed\s+my\s+mind\s*(?:and|,|:)?\s*|"
+        r"i\s+|please\s+|now\s+|instead\s+|choose\s+|make\s+it\s+|"
+        r"(?:would\s+)?(?:prefer|want|need)\s+|prioritize\s+|"
+        r"what\s+i\s+(?:(?:actually|really)\s+)?need\s+is\s*:?\s*)+",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return cleaned.strip(" -;,.")
+
+
+def _contrast_clauses(text: str) -> tuple[str, str, float]:
+    """Return old clause, new clause and confidence for generic contrasts."""
+
+    normalized = normalize_whitespace(text)
+    patterns = (
+        (re.compile(r"\bswitch\s+from\s+(?P<old>.+?)\s+to\s+(?P<new>.+)$", re.I), 0.98),
+        (re.compile(r"\bnot\s+(?P<old>.+?)\s*,?\s+but\s+(?P<new>.+)$", re.I), 0.98),
+        (re.compile(r"(?P<new>.+?)\s+instead\s+of\s+(?P<old>.+)$", re.I), 0.97),
+        (re.compile(r"(?P<new>.+?)\s+(?:rather|better)\s+than\s+(?P<old>.+)$", re.I), 0.95),
+        (
+            re.compile(
+                r"\bno\s+longer\s+(?:want|need|prefer)?\s*(?P<old>.+?)[,;.]\s*"
+                r"(?:i\s+)?(?:now\s+)?(?:prefer|want|need|prioritize)?\s*(?P<new>.+)$",
+                re.I,
+            ),
+            0.94,
+        ),
+        (
+            re.compile(r"\bno\s+longer\s+(?:want|need|prefer)?\s*(?P<old>.+)$", re.I),
+            0.92,
+        ),
+        (
+            re.compile(
+                r"\banything\s+except\s+(?P<old>.+?)(?:[,;.]\s*(?P<new>.+))?$",
+                re.I,
+            ),
+            0.90,
+        ),
+        (
+            re.compile(
+                r"\bforget\s+(?P<old>.+?)(?:[.;]\s*(?P<new>.+))?$",
+                re.I,
+            ),
+            0.90,
+        ),
+    )
+    for pattern, confidence in patterns:
+        match = pattern.search(normalized)
+        if not match:
+            continue
+        old_clause = _clean_clause(match.groupdict().get("old") or "")
+        new_clause = _clean_clause(match.groupdict().get("new") or "")
+        if old_clause or new_clause:
+            return old_clause, new_clause, confidence
+
+    new_patterns = (
+        re.compile(r"\bwhat\s+i\s+(?:(?:actually|really)\s+)?need\s+is\s*:?\s*(?P<new>.+)$", re.I),
+        re.compile(r"\bchanged?\s+my\s+mind\b[,;:]?\s*(?P<new>.+)$", re.I),
+        re.compile(r"\binstead\b[,;:]?\s*(?P<new>.+)$", re.I),
+    )
+    for pattern in new_patterns:
+        match = pattern.search(normalized)
+        if match and _clean_clause(match.group("new")):
+            return "", _clean_clause(match.group("new")), 0.78
+    return "", "", 0.0
 
 
 def classify_constraint_text(value: str) -> str:
@@ -109,12 +185,26 @@ def classify_constraint_text(value: str) -> str:
     return "feature"
 
 
-def _constraint(attribute: str, value: str, turn: int) -> Constraint | None:
+def _constraint(
+    attribute: str,
+    value: str,
+    turn: int,
+    *,
+    status: str = "active",
+    confidence: float = 1.0,
+) -> Constraint | None:
     cleaned = normalize_whitespace(value).strip(" -;,.")
     terms = () if attribute == "budget" else lexical_terms(cleaned, limit=40)
     if not cleaned or (not terms and attribute != "budget"):
         return None
-    return Constraint(attribute=attribute, value=cleaned, terms=terms, source_turn=turn)
+    return Constraint(
+        attribute=attribute,
+        value=cleaned,
+        terms=terms,
+        source_turn=turn,
+        status=status,
+        confidence=max(0.0, min(1.0, float(confidence))),
+    )
 
 
 def _explicit_clauses(text: str) -> list[str]:
@@ -132,7 +222,10 @@ class ConstraintExtractor:
     def extract(self, text: object, turn: int, last_asked: str | None = None) -> ConstraintExtraction:
         message = normalize_whitespace(text)
         override = is_override_message(message)
-        analysis_message = _replacement_segment(message) if override else message
+        old_clause, new_clause, replacement_confidence = _contrast_clauses(message) if override else ("", "", 0.0)
+        analysis_message = new_clause or (_replacement_segment(message) if override else message)
+        if override and old_clause and not new_clause:
+            analysis_message = ""
         declined = find_declined_attributes(message, last_asked)
         if is_decline_message(message):
             return ConstraintExtraction(
@@ -141,6 +234,7 @@ class ConstraintExtractor:
                 metadata={
                     "override": override,
                     "override_scope": "global" if GLOBAL_OVERRIDE_RE.search(message) else "slots",
+                    "replacement_text": "",
                 },
             )
 
@@ -216,4 +310,112 @@ class ConstraintExtractor:
             deduplicated.append(item)
         result.constraints = deduplicated
         result.retrieval_terms = unique_terms(result.retrieval_terms, limit=80)
+
+        if override:
+            old_constraints = self._segment_constraints(
+                old_clause,
+                turn,
+                status="negative",
+                confidence=replacement_confidence or 0.65,
+            )
+            old_slots = {item.attribute for item in old_constraints}
+            new_slots = {item.attribute for item in result.constraints}
+            old_categories = set(extract_category_terms(old_clause))
+            new_categories = set(result.category_terms)
+            category_changed = bool(
+                old_categories
+                and new_categories
+                and old_categories.isdisjoint(new_categories)
+            )
+            global_scope = bool(GLOBAL_OVERRIDE_RE.search(message))
+            if global_scope:
+                replacement_type = "global"
+            elif category_changed or (new_categories and not old_clause):
+                replacement_type = "category"
+            elif (old_slots & new_slots) - {"feature", "category"}:
+                replacement_type = "attribute"
+            elif old_clause and not new_clause:
+                replacement_type = "negative"
+            else:
+                replacement_type = "ambiguous"
+
+            if replacement_type == "category":
+                affected_slots = ("category",)
+            else:
+                affected = (old_slots & new_slots) - {"feature", "category"}
+                if not affected and replacement_type == "attribute":
+                    affected = new_slots - {"feature", "category"}
+                affected_slots = tuple(sorted(affected))
+            if affected_slots:
+                old_constraints = [item for item in old_constraints if item.attribute in affected_slots]
+            result.negative_constraints = old_constraints
+            result.replacement = Replacement(
+                old_clause=old_clause,
+                new_clause=analysis_message,
+                affected_slots=affected_slots,
+                replacement_type=replacement_type,
+                confidence=replacement_confidence or (0.72 if analysis_message else 0.60),
+                ambiguous=replacement_type == "ambiguous",
+            )
+            result.metadata.update(
+                {
+                    "override_scope": replacement_type,
+                    "old_clause": old_clause,
+                    "new_clause": analysis_message,
+                    "replacement_type": replacement_type,
+                    "replacement_confidence": result.replacement.confidence,
+                }
+            )
         return result
+
+    def _segment_constraints(
+        self,
+        segment: str,
+        turn: int,
+        *,
+        status: str,
+        confidence: float,
+    ) -> list[Constraint]:
+        if not segment:
+            return []
+        lowered = segment.lower()
+        tokens = set(lexical_terms(lowered, include_price_tokens=False))
+        items: list[Constraint] = []
+        for value in sorted(tokens & MATERIALS):
+            if item := _constraint("material", value, turn, status=status, confidence=confidence):
+                items.append(item)
+        for value in sorted(tokens & COLORS):
+            if item := _constraint("color", value, turn, status=status, confidence=confidence):
+                items.append(item)
+        for value in sorted(tokens & STYLES):
+            if item := _constraint("style", value, turn, status=status, confidence=confidence):
+                items.append(item)
+        for value in sorted(tokens & USE_CASES):
+            if item := _constraint("use_case", value, turn, status=status, confidence=confidence):
+                items.append(item)
+        size_match = SIZE_RE.search(lowered)
+        if size_match and "size" in lowered:
+            if item := _constraint("size", size_match.group(0), turn, status=status, confidence=confidence):
+                items.append(item)
+        budget_match = BUDGET_RE.search(lowered)
+        if budget_match:
+            if item := _constraint("budget", budget_match.group(0), turn, status=status, confidence=confidence):
+                items.append(item)
+        brand_match = BRAND_RE.search(segment)
+        if brand_match:
+            if item := _constraint("brand", brand_match.group(1), turn, status=status, confidence=confidence):
+                items.append(item)
+        category_terms = extract_category_terms(segment)
+        if category_terms:
+            if item := _constraint(
+                "category",
+                " ".join(category_terms),
+                turn,
+                status=status,
+                confidence=confidence,
+            ):
+                items.append(item)
+        deduplicated: dict[tuple[str, tuple[str, ...]], Constraint] = {}
+        for item in items:
+            deduplicated[(item.attribute, item.terms)] = item
+        return list(deduplicated.values())

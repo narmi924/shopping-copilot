@@ -38,6 +38,8 @@ DECLINE_PATTERNS = (
     re.compile(r"\b(?:use|trust)\s+your\s+(?:best\s+)?judg(?:e)?ment\b", re.IGNORECASE),
     re.compile(r"\b(?:anything|either)\s+is\s+fine\b", re.IGNORECASE),
     re.compile(r"\bno\s+strong\s+feelings?\b", re.IGNORECASE),
+    re.compile(r"\bindifferent\s+(?:to|about)\b", re.IGNORECASE),
+    re.compile(r"\b(?:stop|don['’]?t\s+keep)\s+asking\b", re.IGNORECASE),
 )
 
 CATEGORY_HINTS = {

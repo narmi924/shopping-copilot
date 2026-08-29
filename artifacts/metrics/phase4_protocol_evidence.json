@@ -1,0 +1,116 @@
+{
+  "experiment": "phase4_protocol_evidence",
+  "control_commit": "88b10b661431af98992d5e71493103674a53d386",
+  "sample_count": 200,
+  "hit_rate_at_10": 0.94,
+  "mrr": 0.645704,
+  "mttc": 3.985,
+  "efficiency": 0.7015,
+  "recommended_technical_score": 0.804011,
+  "reported_token_usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
+  },
+  "scenario_metrics": {
+    "buying": {
+      "sample_count": 80,
+      "hits": 76,
+      "hit_rate_at_10": 0.95,
+      "mrr": 0.622634,
+      "mttc": 3.3125
+    },
+    "browsing": {
+      "sample_count": 80,
+      "hits": 77,
+      "hit_rate_at_10": 0.9625,
+      "mrr": 0.664474,
+      "mttc": 3.4375
+    },
+    "intent_override": {
+      "sample_count": 30,
+      "hits": 25,
+      "hit_rate_at_10": 0.833333,
+      "mrr": 0.637037,
+      "mttc": 6.566667
+    },
+    "boundary": {
+      "sample_count": 10,
+      "hits": 10,
+      "hit_rate_at_10": 1.0,
+      "mrr": 0.706111,
+      "mttc": 6.0
+    }
+  },
+  "public_control": {
+    "hits": 183,
+    "hit_rate_at_10": 0.915,
+    "mrr": 0.561236,
+    "mttc": 4.4,
+    "efficiency": 0.66,
+    "recommended_technical_score": 0.757871,
+    "scenario_hits": {
+      "buying": 75,
+      "browsing": 75,
+      "intent_override": 25,
+      "boundary": 8
+    }
+  },
+  "exact_policy_unseen_target": {
+    "description": "Three fixed-seed 800-session released-simulator diagnostics; not an organizer holdout.",
+    "control": {
+      "mean_hits": 739.0,
+      "mean_hit_rate_at_10": 0.92375,
+      "mean_mrr": 0.590971,
+      "mean_mttc": 3.812083,
+      "mean_recommended_technical_score": 0.782925,
+      "technical_score_sample_variance": 0.00005428
+    },
+    "selected": {
+      "mean_hits": 762.333333,
+      "mean_hit_rate_at_10": 0.952917,
+      "mean_mrr": 0.70429,
+      "mean_mttc": 3.53125,
+      "mean_recommended_technical_score": 0.83712,
+      "technical_score_sample_variance": 0.00003163
+    }
+  },
+  "neutral_profile_slice": {
+    "description": "One fixed-seed paired 400-session diagnostic with empty profiles.",
+    "control": {
+      "hits": 363,
+      "hit_rate_at_10": 0.9075,
+      "mrr": 0.567134,
+      "mttc": 4.185
+    },
+    "selected": {
+      "hits": 370,
+      "hit_rate_at_10": 0.925,
+      "mrr": 0.680155,
+      "mttc": 3.95
+    }
+  },
+  "evidence_index": {
+    "unique_keys": 228307,
+    "postings": 527885,
+    "build_seconds": 4.466509,
+    "query_latency_p50_ms": 0.0431,
+    "query_latency_p95_ms": 2.3032
+  },
+  "runtime": {
+    "control_wall_seconds": 64.472958,
+    "selected_wall_seconds": 70.288284,
+    "selected_to_control_ratio": 1.090198,
+    "selected_peak_working_set_mib": 642.07
+  },
+  "environment": {
+    "python": "3.13.1",
+    "uv": "0.12.5",
+    "os": "Windows 10.0.26200 x64"
+  },
+  "tests": {
+    "passed": 73,
+    "failed": 0
+  },
+  "decision": "accepted_protocol_evidence"
+}

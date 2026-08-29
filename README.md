@@ -10,20 +10,20 @@ The unchanged official evaluator completed all 200 public sessions with zero mod
 
 | Metric | Official baseline | Current offline Agent | Absolute change |
 |---|---:|---:|---:|
-| Hit Rate@10 | 0.125000 | 0.915000 | +0.790000 |
-| MRR | 0.068034 | 0.561236 | +0.493202 |
-| MTTC (lower is better) | 9.810000 | 4.400000 | -5.410000 |
-| Efficiency | 0.119000 | 0.660000 | +0.541000 |
-| Recommended TechnicalScore | 0.106710 | 0.757871 | +0.651161 |
+| Hit Rate@10 | 0.125000 | 0.940000 | +0.815000 |
+| MRR | 0.068034 | 0.645704 | +0.577670 |
+| MTTC (lower is better) | 9.810000 | 3.985000 | -5.825000 |
+| Efficiency | 0.119000 | 0.701500 | +0.582500 |
+| Recommended TechnicalScore | 0.106710 | 0.804011 | +0.697301 |
 
 | Scenario | Baseline HR@10 | Current HR@10 | Change |
 |---|---:|---:|---:|
-| Buying | 0.237500 | 0.937500 | +0.700000 |
-| Browsing | 0.025000 | 0.937500 | +0.912500 |
+| Buying | 0.237500 | 0.950000 | +0.712500 |
+| Browsing | 0.025000 | 0.962500 | +0.937500 |
 | Intent Override | 0.133333 | 0.833333 | +0.700000 |
-| Boundary | 0.000000 | 0.800000 | +0.800000 |
+| Boundary | 0.000000 | 1.000000 | +1.000000 |
 
-The current configuration was selected through isolated component experiments, generic metamorphic tests, and two private catalog-derived unseen-target benchmarks intended to reduce public-set overfitting risk. These synthetic benchmarks are not organizer holdouts and are not evidence of private-set performance. Reproduction details and the V1-to-current progression are recorded in [docs/evaluation.md](docs/evaluation.md).
+The current configuration was selected through isolated component experiments, generic protocol tests, and fixed-seed exact-policy unseen-target simulations intended to reduce public-set overfitting risk. These simulations use the released evaluator with non-public catalog targets; they are not organizer holdouts and are not evidence of private-set performance. Reproduction details and the V1-to-current progression are recorded in [docs/evaluation.md](docs/evaluation.md).
 
 ## Project layout
 
@@ -136,13 +136,14 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 - history-aware current/constraint/stable/profile retrieval routes;
 - Buying, Browsing, and Intent Override routing with slot-aware attribute/category replacement;
 - explicit negative constraints, constraint provenance, and bounded dual hypotheses for ambiguous overrides;
-- no-preference/declined-attribute handling that does not contaminate queries;
+- distinct declined and exhausted attribute state, so no-preference retracts a slot while no-additional-preference preserves its evidence;
 - in-memory SQLite FTS5, strict and broad retrieval tracks, weighted RRF, and bounded constraint-coverage reranking;
+- a read-only catalog Evidence Fingerprint index for exact disclosed feature, detail, material, color, and budget clauses;
 - read-only catalog facets for category, brand, color, material, style, size, price bands, features, and use cases;
 - candidate-aware clarification based on metadata coverage, partition gain, route relevance, prior questions, declines, and remaining turns;
 - an adaptive Top-10 portfolio that protects high ranks and uses lower slots for bounded facet coverage when the route is uncertain;
 - structured budget scoring, deterministic fallbacks, catalog membership validation, and deduplication;
-- clarification that does not repeat asked/declined attributes and always accompanies recommendations when candidates exist;
+- clarification that stops exhausted slots, permits at most two useful `other` questions, and always accompanies recommendations when candidates exist;
 - optional FastAPI session adapter and React demo using the same Agent instance contract.
 
 ## Not implemented
@@ -154,6 +155,6 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 
 ## Limitations
 
-The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Open-ended Browsing remains the weakest slice on the broad unseen-target stress benchmark. Candidate facets are intentionally conservative when catalog metadata is missing. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query, document, and facet caches.
+The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Candidate facets and evidence matches are intentionally conservative when catalog metadata is missing. The first Agent construction loads the catalog and builds both FTS5 and evidence indexes in memory; later turns benefit from bounded deterministic query, document, and facet caches.
 
 This repository excludes the catalog, secrets, virtual environments, caches, `results.json`, `node_modules`, and frontend build output.

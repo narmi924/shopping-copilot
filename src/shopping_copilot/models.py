@@ -31,9 +31,11 @@ class ProductRecord:
     categories: tuple[str, ...]
     features: tuple[str, ...]
     details: tuple[tuple[str, str], ...]
+    evidence_details: tuple[tuple[str, str], ...]
     store: str
     description: tuple[str, ...]
     price: float | None
+    price_evidence: str | None
     average_rating: float | None
     rating_number: int
 
@@ -74,6 +76,19 @@ class TurnRecord:
     intent_route: str
     retrieval_terms: tuple[str, ...]
     declined_attributes: tuple[str, ...] = ()
+    exhausted_attributes: tuple[str, ...] = ()
+    feedback_event: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceClause:
+    """A complete catalog-derived requirement disclosed during dialogue."""
+
+    value: str
+    normalized_key: str
+    source_turn: int
+    attribute: str
+    status: str = "active"
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,5 +117,8 @@ class ConstraintExtraction:
     negative_constraints: list[Constraint] = field(default_factory=list)
     replacement: Replacement | None = None
     declined_attributes: set[str] = field(default_factory=set)
+    exhausted_attributes: set[str] = field(default_factory=set)
+    evidence_clauses: tuple[str, ...] = ()
     decline_only: bool = False
+    feedback_event: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)

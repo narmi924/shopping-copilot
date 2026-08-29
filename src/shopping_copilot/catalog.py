@@ -28,6 +28,12 @@ def _details_tuple(value: object) -> tuple[tuple[str, str], ...]:
     return tuple((str(key), flatten_text(item)) for key, item in value.items())
 
 
+def _evidence_details_tuple(value: object) -> tuple[tuple[str, str], ...]:
+    if not isinstance(value, dict):
+        return ()
+    return tuple((str(key), str(item)) for key, item in value.items() if item not in (None, "", []))
+
+
 def _float_or_none(value: object) -> float | None:
     try:
         return None if value in (None, "") else float(value)
@@ -94,9 +100,15 @@ class CatalogIndex:
                     categories=_string_tuple(raw.get("categories")),
                     features=_string_tuple(raw.get("features")),
                     details=_details_tuple(raw.get("details")),
+                    evidence_details=_evidence_details_tuple(raw.get("details")),
                     store=str(raw.get("store") or ""),
                     description=_string_tuple(raw.get("description")),
                     price=_float_or_none(raw.get("price")),
+                    price_evidence=(
+                        str(raw.get("price"))
+                        if raw.get("price") not in (None, "")
+                        else None
+                    ),
                     average_rating=_float_or_none(raw.get("average_rating")),
                     rating_number=_int_or_zero(raw.get("rating_number")),
                 )

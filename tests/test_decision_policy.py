@@ -24,13 +24,18 @@ def _write_catalog(path: Path, products: list[dict]) -> Path:
 def test_accepted_policy_is_default_and_control_remains_available(catalog_path: Path) -> None:
     accepted = Agent(catalog_path)
     control = Agent(catalog_path, policy_mode="control")
+    phase3 = Agent(catalog_path, policy_mode="phase3")
 
-    assert accepted.policy_config.name == "question_portfolio"
+    assert accepted.policy_config.name == "protocol_evidence"
     assert accepted.policy_config.question_value is True
     assert accepted.policy_config.candidate_portfolio is True
+    assert accepted.policy_config.response_semantics is True
+    assert accepted.policy_config.evidence_fingerprint is True
     assert control.policy_config.name == "control"
     assert control.policy_config.question_value is False
     assert control.policy_config.candidate_portfolio is False
+    assert phase3.policy_config.name == "phase3"
+    assert phase3.policy_config.evidence_fingerprint is False
 
 
 def test_unknown_policy_mode_is_rejected(catalog_path: Path) -> None:

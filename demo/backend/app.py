@@ -19,7 +19,7 @@ from shopping_copilot.agent import Agent
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CATALOG_PATH = PROJECT_ROOT / "data" / "catalog.jsonl"
-DEFAULT_METRICS_PATH = PROJECT_ROOT / "artifacts" / "metrics" / "v2_final_offline.json"
+DEFAULT_METRICS_PATH = PROJECT_ROOT / "artifacts" / "metrics" / "phase4_protocol_evidence.json"
 BASELINE_METRICS_PATH = PROJECT_ROOT / "artifacts" / "metrics" / "official_baseline.json"
 
 
@@ -132,7 +132,7 @@ class DemoService:
         return {
             "candidate": _metric_summary(candidate),
             "baseline": _metric_summary(baseline),
-            "label": "Final offline agent",
+            "label": "Current offline Agent",
         }
 
 

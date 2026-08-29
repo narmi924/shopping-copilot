@@ -20,6 +20,7 @@ Metric summaries are versioned in:
 - `artifacts/metrics/v2_final_offline.json`
 - `artifacts/metrics/phase2_override_v2.json`
 - `artifacts/metrics/phase3_decision_policy.json`
+- `artifacts/metrics/phase4_protocol_evidence.json`
 
 These files intentionally contain aggregate results rather than per-session
 evaluator output.
@@ -205,6 +206,56 @@ control, and used approximately 572.379 MiB peak working set. All 57 tests passe
 separate adaptive-profile experiment had no unseen-target benefit. A bounded
 catalog prior regressed the target-like benchmark and exceeded the runtime gate.
 Neither rejected component is present in the current runtime.
+
+## Phase-four protocol evidence
+
+Phase four uses commit `88b10b661431af98992d5e71493103674a53d386` as its immutable Phase 3 control. It corrects clarification feedback semantics, permits a bounded second `other` question, and adds exact catalog-derived Evidence Fingerprint retrieval. The Phase 3 policy remains selectable as `phase3`.
+
+The fixed-seed exact-policy unseen-target benchmark contains only sample identity, scenario, independently assigned public-profile data, and a non-public catalog target before it is passed to the unchanged released evaluator. The evaluator itself materializes intent cards, behavior, opening messages, and replies. Targets are unique per run, exclude every public target, and are split evenly between aggregate-distribution-matched and catalog-wide cohorts. The scenario ratio is 40% Buying, 40% Browsing, 15% Intent Override, and 5% Boundary. It is a released-simulator diagnostic, not an organizer holdout.
+
+### Component matrix
+
+The public column uses all 200 official sessions. The exact-policy column is the fixed 200-session development seed; cross-seed variance is not estimated for these screening runs and was measured only after shortlisting the combined candidate.
+
+| Candidate | Public hits | Public HR@10 | Public MRR | Public MTTC | Public TechnicalScore | Exact-policy hits | Exact-policy TechnicalScore | Decision |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Phase 3 control | 183 | 0.915000 | 0.561236 | 4.400000 | 0.757871 | 181 | 0.769433 | control |
+| Response semantics | 182 | 0.910000 | 0.570617 | 4.445000 | 0.757285 | 180 | 0.766483 | reject |
+| Repeated `other` twice | 188 | 0.940000 | 0.587673 | 4.370000 | 0.778902 | 181 | 0.769433 | component only |
+| Evidence index | 186 | 0.930000 | 0.629732 | 4.120000 | 0.791520 | 186 | 0.802198 | component only |
+| Buying rank recovery | 183 | 0.915000 | 0.561236 | 4.400000 | 0.757871 | 181 | 0.769433 | reject as behavior-equivalent |
+| Semantics + repeated `other` | 184 | 0.920000 | 0.576173 | 4.415000 | 0.764552 | 180 | 0.766483 | reject |
+| Semantics + evidence | 186 | 0.930000 | 0.635149 | 4.135000 | 0.792845 | 183 | 0.794675 | component only |
+| Repeated `other` + evidence | 189 | 0.945000 | 0.637579 | 4.115000 | 0.801474 | 186 | 0.806402 | reject: incomplete feedback semantics |
+| Full, fallback `other` | 187 | 0.935000 | 0.635704 | 4.120000 | 0.795811 | 185 | 0.802026 | shortlist |
+| Protocol evidence | 188 | 0.940000 | 0.645704 | 3.985000 | 0.804011 | 186 | 0.806376 | accept |
+
+Allowing `other` twice improved the public result from 183 to 188 hits. A third ask kept 188 hits but reduced MRR from 0.587673 to 0.587173, so the limit remains two. Restricting the second ask to detected Buying produced 188 hits; Browsing-only produced 186 and Override-only 185. There is deliberately no Boundary runtime route because the Agent cannot see scenario labels. Boundary is instead measured as an output slice and rises from 8/10 in the control to 10/10 in the accepted policy.
+
+### Evidence index and final verification
+
+The evidence index contains 228,307 unique normalized keys and 527,885 source-aware postings. Collision counts are 1 at p50, 3 at p95, 14 at p99, and 13,836 maximum. It built in 4.467 seconds. Across 1,000 deterministic lookups, latency was 0.043 ms at p50 and 2.303 ms at p95. An evaluation-only 1,000-product comparison checked 3,953 materialized values against the released normalizer with zero mismatched products.
+
+| Metric | Phase 3 control | Protocol evidence | Change |
+|---|---:|---:|---:|
+| Hit Rate@10 | 0.915000 | 0.940000 | +0.025000 |
+| MRR | 0.561236 | 0.645704 | +0.084468 |
+| MTTC | 4.400000 | 3.985000 | -0.415000 |
+| Efficiency | 0.660000 | 0.701500 | +0.041500 |
+| Recommended TechnicalScore | 0.757871 | 0.804011 | +0.046140 |
+
+| Scenario | Control hits | Current hits | Control MRR | Current MRR |
+|---|---:|---:|---:|---:|
+| Buying | 75/80 | 76/80 | 0.528309 | 0.622634 |
+| Browsing | 75/80 | 77/80 | 0.566190 | 0.664474 |
+| Intent Override | 25/30 | 25/30 | 0.607037 | 0.637037 |
+| Boundary | 8/10 | 10/10 | 0.647619 | 0.706111 |
+
+The final exact-policy comparison used three paired seeds with 800 unique unseen targets per seed. Mean TechnicalScore increased from 0.782925 (sample variance 0.00005428) to 0.837120 (sample variance 0.00003163). Mean HR@10 rose from 0.923750 to 0.952917, mean MRR from 0.590971 to 0.704290, and mean MTTC fell from 3.812083 to 3.531250. The candidate added 70 hits across 2,400 paired sessions, with no scenario hit regression in any seed.
+
+A separate 400-session empty-profile slice rose from 363 to 370 hits, MRR 0.567134 to 0.680155, and MTTC 4.185000 to 3.950000. This indicates that the measured gain does not depend on profile matching.
+
+The frozen official run completed in 70.288 seconds, 1.090 times the 64.473-second control rerun, with an approximate 642.070 MiB peak working set and zero model tokens. All 73 tests passed.
 
 ## Interpretation
 

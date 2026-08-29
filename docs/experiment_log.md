@@ -181,3 +181,28 @@ candidate that passed protected-file, public-score, scenario-preservation,
 matched-Browsing, broad-Browsing, determinism, runtime, memory, isolation, and
 test gates. The MTTC regression on the public simulator is retained as an
 explicit tradeoff because both unseen-target suites provide stronger outcomes.
+
+## 2026-08-30 — Protocol-aligned evidence and turn efficiency
+
+Control source: `88b10b661431af98992d5e71493103674a53d386`. The hypothesis was that published clarification feedback and complete catalog-derived clauses contain enough deterministic evidence to recover rank and turn efficiency without a semantic model or larger lexical pool.
+
+The selected implementation distinguishes declined from exhausted slots, tracks per-attribute ask counts, allows at most two useful `other` questions, and builds a query-only reverse evidence index from visible catalog fields. Exact current-turn clauses are fused with FTS candidates, while declines, replacement cleanup, negative constraints, and catalog membership remain enforced at the state/reranking boundaries.
+
+| Experiment | Public hits | Public MRR | Public MTTC | TechnicalScore | Decision |
+|---|---:|---:|---:|---:|---|
+| Phase 3 control | 183 | 0.561236 | 4.400000 | 0.757871 | control |
+| Response semantics | 182 | 0.570617 | 4.445000 | 0.757285 | reject |
+| Repeated `other` twice | 188 | 0.587673 | 4.370000 | 0.778902 | component only |
+| Evidence index | 186 | 0.629732 | 4.120000 | 0.791520 | component only |
+| Buying rank recovery | 183 | 0.561236 | 4.400000 | 0.757871 | reject as redundant |
+| Semantics + repeated `other` | 184 | 0.576173 | 4.415000 | 0.764552 | reject |
+| Semantics + evidence | 186 | 0.635149 | 4.135000 | 0.792845 | component only |
+| Repeated `other` + evidence | 189 | 0.637579 | 4.115000 | 0.801474 | reject: incomplete semantics |
+| Full fallback policy | 187 | 0.635704 | 4.120000 | 0.795811 | shortlist |
+| Protocol evidence | 188 | 0.645704 | 3.985000 | 0.804011 | accept |
+
+The three paired 800-session exact-policy seeds increased mean TechnicalScore from 0.782925 to 0.837120 and added 70 hits across 2,400 unseen-target sessions. An empty-profile 400-session slice added seven hits and improved MRR by 0.113021. These are released-simulator diagnostics, not organizer holdouts.
+
+The accepted official run completed in 70.288 seconds with a 642.070 MiB approximate peak working set. Buying MRR recovered from 0.528309 to 0.622634, public MTTC fell by 0.415 turns, all four scenario hit counts were preserved or improved, all 73 tests passed, and the protected assets remained byte-identical.
+
+Decision: accept the protocol-evidence configuration and keep `phase3` as a selectable deterministic fallback. A third `other` question, a separate Buying rank branch, and incomplete-feedback combinations were removed.

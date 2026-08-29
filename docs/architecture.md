@@ -6,11 +6,13 @@ Shopping Copilot is a deterministic local pipeline. The official entry point rem
 flowchart LR
     E[Evaluator] --> A[starter.Agent adapter]
     A --> X[Constraint and Contrast Parser]
-    X --> S[Session State Reducer]
+    X --> S[Constraint Ledger and State Reducer]
     S --> I[Intent Router]
     I --> Q[Query Builder]
     Q --> L[Multi-route Lexical Retrieval]
+    S --> ER[Evidence Fingerprint Retrieval]
     L --> R[Weighted RRF]
+    ER --> R
     R --> CR[Constraint Coverage Reranker]
     CR --> CP[Bounded Candidate Pool]
     CP --> V[Question Value Estimator]
@@ -21,6 +23,7 @@ flowchart LR
     T --> O
 
     K[(Read-only frozen catalog)] --> L
+    K --> ER
     K --> CR
     K --> F
     P[Safe anonymized profile fields] --> Q
@@ -57,7 +60,7 @@ Normalization and contrast parsing happen before the state reducer. An override 
 6. creates bounded attribute and category hypotheses when the replacement scope is ambiguous;
 7. records the event and exposes only the reduced active state to the Query Builder.
 
-Superseded terms therefore do not enter the active-constraint route. A no-preference reply follows a separate transition: it clears the relevant attribute, records it as declined, emits no current-message terms, and leaves unrelated valid history intact.
+Superseded terms therefore do not enter the active-constraint route. Clarification feedback has two separate transitions: a genuine no-preference reply clears the relevant slot and marks it declined, while a no-additional-preference reply marks the slot exhausted without retracting prior evidence. Neither response contributes product-query terms, and unrelated valid history remains active. Per-slot ask counts allow a bounded repeat only for `other`.
 
 ## Retrieval and ranking
 
@@ -69,20 +72,23 @@ Superseded terms therefore do not enter the active-constraint route. A no-prefer
 | Profile | safe preference tags and summary | 0.35 / 0.20 on override | weak personalization only |
 | Attribute hypothesis | ambiguous override only | 4.00 | test a local slot replacement |
 | Category hypothesis | ambiguous override only | 2.60 | test a category replacement conservatively |
+| Evidence | complete catalog-derived clauses | 12.00 | recover products matching exact disclosed evidence |
 
 Each route retrieves independently from FTS5. Buying/Browsing turns may add an all-terms precision track; override turns stay on broad fusion for that response. Weighted Reciprocal Rank Fusion deduplicates by identifier and orders by fused score, best route rank, then `parent_asin`.
 
-A bounded reranker combines the fused rank with current-message coverage, active slot coverage, stable context, and structured budget evidence. Override turns additionally reward current-turn slot coverage and apply capped penalties for explicit negative and most recently superseded values. These are ranking signals, not hard catalog exclusions, so one uncertain parse cannot remove the candidate pool.
+A read-only SQLite reverse index independently normalizes visible feature strings, detail key/value strings, detected material and color, and available price evidence. Exact clauses such as a disclosed key requirement enter a bounded evidence route; rarer matches and multiple independent clauses receive more weight. Source provenance and collision counts are retained, broad keys are capped, and every posting is an existing catalog identifier.
+
+A bounded reranker combines the fused rank with current-message coverage, active slot coverage, exact evidence, stable context, and structured budget evidence. Override turns additionally reward current-turn slot coverage and apply capped penalties for explicit negative and most recently superseded values. Replaced evidence is removed from active evidence queries. These are ranking signals, not hard catalog exclusions, so one uncertain parse cannot remove the candidate pool.
 
 ## Decision-aware dialogue policy
 
 The candidate facet index derives only evidenced values from visible catalog fields. It supports category, brand/store, color, material, style, size, price bands, feature terms, and use-case terms, tolerates missing metadata, and uses a bounded lazy cache rather than a second full product copy.
 
-For every legal unasked and non-declined attribute, the Question Value Estimator computes a bounded utility from candidate metadata coverage, normalized partition gain, route relevance, score uncertainty, override ambiguity, and remaining turns. Active constraints are normally excluded. Ambiguous replacement is the exception: category may be asked again when it distinguishes the two retained hypotheses. A low-value `other` fallback is available early in the dialogue, and late turns may return no question. The customer-facing message is still generated from the selected legal attribute, and recommendations are returned on the same turn.
+For every legal unasked, non-declined, and non-exhausted specific attribute, the Question Value Estimator computes a bounded utility from candidate metadata coverage, normalized partition gain, route relevance, score uncertainty, override ambiguity, and remaining turns. Active constraints are normally excluded. Ambiguous replacement is the exception: category may be asked again when it distinguishes the two retained hypotheses. `other` may be asked at most twice while enough turns remain; its second prompt uses distinct natural wording and stops immediately after exhaustion. Late turns may return no question. The customer-facing message is still generated from the selected legal attribute, and recommendations are returned on the same turn.
 
 The Top-10 selector treats recommendations as one portfolio. It preserves an ordered precision core, then chooses a small exploration tail from the bounded reranked pool using relevance, current/active constraint coverage, facet novelty, near-duplicate similarity, and negative/superseded evidence. The accepted configuration uses almost all precision for Buying, roughly 70% precision for early vague Browsing, about 85% after useful constraints accumulate, at least 80% after a decline, and 75–85% for Override depending on confidence. These fractions were selected through the documented component experiments; diversity operates only below the protected ranks.
 
-The previously accepted lexical ordering remains available as a deterministic fallback by constructing `Agent(..., policy_mode="control")` or setting `SHOPPING_COPILOT_POLICY_MODE=control`. No generated index, model weight, network call, or extra runtime dependency is required.
+The Phase 3 decision policy remains available as a deterministic fallback by constructing `Agent(..., policy_mode="phase3")` or setting `SHOPPING_COPILOT_POLICY_MODE=phase3`. The earlier lexical control also remains selectable as `control`. No generated cache, model weight, network call, or extra runtime dependency is required.
 
 ## Optional presentation path
 

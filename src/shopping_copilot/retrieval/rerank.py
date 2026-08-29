@@ -62,6 +62,8 @@ class ConstraintCoverageReranker:
         candidates: list[FusedResult],
         state: SessionState,
         limit: int,
+        *,
+        evidence_scores: dict[str, float] | None = None,
     ) -> list[RerankedResult]:
         scored: list[RerankedResult] = []
         active_constraints: list[Constraint] = [
@@ -81,10 +83,13 @@ class ConstraintCoverageReranker:
             if override_turn and state.override_events
             else []
         )
+        exact_evidence_scores = evidence_scores or {}
         for base_rank, candidate in enumerate(candidates, 1):
             terms = self.catalog.document_terms(candidate.parent_asin)
             product = self.catalog.get_product(candidate.parent_asin)
             score = candidate.score * 5.0 + 1.0 / (20.0 + base_rank)
+            if candidate.parent_asin in exact_evidence_scores:
+                score += min(18.0, 2.0 * exact_evidence_scores[candidate.parent_asin])
 
             current_coverage = _coverage(state.current_retrieval_terms, terms)
             score += 4.5 * current_coverage

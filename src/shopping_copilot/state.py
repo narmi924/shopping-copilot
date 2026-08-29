@@ -6,8 +6,8 @@ import copy
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .models import Constraint, ConstraintExtraction, OverrideEvent, TurnRecord
-from .text import safe_profile_terms, unique_terms
+from .models import Constraint, ConstraintExtraction, EvidenceClause, OverrideEvent, TurnRecord
+from .text import lexical_terms, normalize_evidence_key, safe_profile_terms, unique_terms
 
 
 def _safe_profile_copy(profile: object) -> dict[str, Any]:
@@ -32,6 +32,8 @@ class SessionState:
     current_turn_constraints: tuple[Constraint, ...] = ()
     asked_attributes: set[str] = field(default_factory=set)
     declined_attributes: set[str] = field(default_factory=set)
+    exhausted_attributes: set[str] = field(default_factory=set)
+    ask_counts: dict[str, int] = field(default_factory=dict)
     last_asked_attribute: str | None = None
     current_retrieval_terms: tuple[str, ...] = ()
     stable_category_terms: tuple[str, ...] = ()
@@ -46,6 +48,9 @@ class SessionState:
     last_ranking_scores: tuple[tuple[str, float], ...] = ()
     last_question_decision: dict[str, Any] = field(default_factory=dict)
     last_portfolio_decision: dict[str, Any] = field(default_factory=dict)
+    active_evidence: list[EvidenceClause] = field(default_factory=list)
+    superseded_evidence: list[EvidenceClause] = field(default_factory=list)
+    current_evidence_clauses: tuple[str, ...] = ()
 
     @classmethod
     def create(cls, session_id: str, user_profile: object) -> "SessionState":
@@ -62,6 +67,8 @@ class SessionState:
         intent_route: str,
         retrieval_terms: tuple[str, ...],
         declined_attributes: set[str] | None = None,
+        exhausted_attributes: set[str] | None = None,
+        feedback_event: str | None = None,
     ) -> None:
         self.current_intent_route = intent_route
         self.current_retrieval_terms = retrieval_terms
@@ -72,11 +79,14 @@ class SessionState:
                 intent_route=intent_route,
                 retrieval_terms=retrieval_terms,
                 declined_attributes=tuple(sorted(declined_attributes or set())),
+                exhausted_attributes=tuple(sorted(exhausted_attributes or set())),
+                feedback_event=feedback_event,
             )
         )
 
     def merge_constraints(self, extraction: ConstraintExtraction) -> None:
         self.current_turn_constraints = tuple(extraction.constraints)
+        self.current_evidence_clauses = tuple(extraction.evidence_clauses)
         self.replacement_scope = None
         self.override_confidence = 0.0
         self.override_hypotheses.clear()
@@ -87,6 +97,7 @@ class SessionState:
             )
         for constraint in extraction.constraints:
             self.declined_attributes.discard(constraint.attribute)
+            self.exhausted_attributes.discard(constraint.attribute)
             self.negative_constraints = [
                 negative
                 for negative in self.negative_constraints
@@ -99,15 +110,53 @@ class SessionState:
             if any(existing.terms == constraint.terms for existing in bucket):
                 continue
             bucket.append(constraint)
+        for raw_clause in extraction.evidence_clauses:
+            key = normalize_evidence_key(raw_clause)
+            if not key:
+                continue
+            attribute = "feature"
+            clause_terms = set(lexical_terms(raw_clause, include_price_tokens=False))
+            for constraint in extraction.constraints:
+                if constraint.terms and set(constraint.terms).issubset(clause_terms):
+                    attribute = constraint.attribute
+                    break
+            if any(item.normalized_key == key for item in self.active_evidence):
+                continue
+            self.active_evidence.append(
+                EvidenceClause(
+                    value=normalize_evidence_key(raw_clause),
+                    normalized_key=key,
+                    source_turn=max(0, int(extraction.metadata.get("source_turn", 0))),
+                    attribute=attribute,
+                )
+            )
 
     def mark_declined(self, attributes: set[str]) -> None:
         for attribute in attributes:
             self.declined_attributes.add(attribute)
+            self.exhausted_attributes.discard(attribute)
             removed = self.active_constraints.pop(attribute, [])
             self.superseded_constraints.extend(replace(item, status="superseded") for item in removed)
             self.negative_constraints = [
                 item for item in self.negative_constraints if item.attribute != attribute
             ]
+            retained_evidence: list[EvidenceClause] = []
+            for item in self.active_evidence:
+                if item.attribute == attribute:
+                    self.superseded_evidence.append(replace(item, status="superseded"))
+                else:
+                    retained_evidence.append(item)
+            self.active_evidence = retained_evidence
+
+    def mark_exhausted(self, attributes: set[str]) -> None:
+        """Stop asking a slot while preserving every active constraint and evidence value."""
+
+        for attribute in attributes:
+            self.exhausted_attributes.add(attribute)
+
+    def clear_current_feedback(self) -> None:
+        self.current_turn_constraints = ()
+        self.current_evidence_clauses = ()
 
     def apply_override(self, extraction: ConstraintExtraction, turn: int, user_message: str) -> None:
         self.current_turn_constraints = tuple(extraction.constraints)
@@ -176,6 +225,10 @@ class SessionState:
                 self.active_constraints.pop("category", None)
         if replacement_type == "global":
             attributes_to_remove = set(self.active_constraints) - preserved_attributes
+            self.superseded_evidence.extend(
+                replace(item, status="superseded") for item in self.active_evidence
+            )
+            self.active_evidence.clear()
         elif replacement_type == "category":
             attributes_to_remove = {"category", "size", "style", "brand", "feature"}
         elif replacement_type == "negative":
@@ -202,6 +255,29 @@ class SessionState:
             attributes_to_remove = affected_slots
         for attribute in sorted(attributes_to_remove):
             removed.extend(self.active_constraints.pop(attribute, []))
+        if replacement_type != "global":
+            negative_terms = {
+                attribute: {
+                    term
+                    for constraint in extraction.negative_constraints
+                    if constraint.attribute == attribute
+                    for term in constraint.terms
+                }
+                for attribute in {
+                    constraint.attribute for constraint in extraction.negative_constraints
+                }
+            }
+            retained_evidence: list[EvidenceClause] = []
+            for item in self.active_evidence:
+                item_terms = set(lexical_terms(item.value, include_price_tokens=False))
+                conflicts_with_negative = bool(
+                    item_terms.intersection(negative_terms.get(item.attribute, set()))
+                )
+                if item.attribute in attributes_to_remove or conflicts_with_negative:
+                    self.superseded_evidence.append(replace(item, status="superseded"))
+                else:
+                    retained_evidence.append(item)
+            self.active_evidence = retained_evidence
         superseded = [replace(item, status="superseded") for item in removed]
         self.superseded_constraints.extend(superseded)
         for negative in extraction.negative_constraints:
@@ -270,10 +346,24 @@ class SessionState:
             for term in constraint.terms
         )
 
+    def evidence_query_clauses(self) -> tuple[tuple[str, float], ...]:
+        """Return current evidence first, then compatible history at lower weight."""
+
+        current = {normalize_evidence_key(value) for value in self.current_evidence_clauses}
+        values: list[tuple[str, float]] = []
+        for key in sorted(current):
+            if key:
+                values.append((key, 1.0))
+        for item in self.active_evidence:
+            if item.normalized_key and item.normalized_key not in current:
+                values.append((item.normalized_key, 0.55))
+        return tuple(values)
+
     def mark_asked(self, attribute: str | None) -> None:
         self.last_asked_attribute = attribute
         if attribute:
             self.asked_attributes.add(attribute)
+            self.ask_counts[attribute] = self.ask_counts.get(attribute, 0) + 1
 
     def set_recommendations(self, identifiers: list[str]) -> None:
         self.last_recommendation_ids = tuple(identifiers)

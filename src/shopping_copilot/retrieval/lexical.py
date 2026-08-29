@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from .fusion import weighted_reciprocal_rank_fusion
 from .rerank import ConstraintCoverageReranker
 from ..catalog import CatalogIndex
+from ..evidence import EvidenceFingerprintIndex
 from ..models import QueryRoute
 from ..policy import PolicyConfig
 from ..state import SessionState
@@ -63,10 +64,13 @@ class MultiRouteLexicalRetriever:
         self,
         catalog: CatalogIndex,
         query_builder: QueryBuilder | None = None,
+        *,
+        evidence_index: EvidenceFingerprintIndex | None = None,
     ) -> None:
         self.catalog = catalog
         self.query_builder = query_builder or QueryBuilder()
         self.reranker = ConstraintCoverageReranker(catalog)
+        self.evidence_index = evidence_index
 
     def retrieve(self, state: SessionState, top_k: int) -> list[str]:
         return self.retrieve_with_diagnostics(state, top_k).identifiers
@@ -94,6 +98,23 @@ class MultiRouteLexicalRetriever:
                 "terms": list(route.terms),
             }
 
+        evidence_scores: dict[str, float] = {}
+        if self.evidence_index is not None:
+            evidence_matches = self.evidence_index.rank(
+                state.evidence_query_clauses(),
+                limit=candidate_limit,
+            )
+            if evidence_matches:
+                rankings["evidence"] = [item.parent_asin for item in evidence_matches]
+                weights["evidence"] = 12.0
+                evidence_scores = {item.parent_asin: item.score for item in evidence_matches}
+                sources["evidence"] = {
+                    "weight": 12.0,
+                    "candidate_count": len(evidence_matches),
+                    "mode": "exact-evidence",
+                    "clause_count": len(state.evidence_query_clauses()),
+                }
+
         strict_terms = unique_terms(
             (
                 *state.current_retrieval_terms,
@@ -115,7 +136,12 @@ class MultiRouteLexicalRetriever:
             }
 
         fused = weighted_reciprocal_rank_fusion(rankings, weights, limit=candidate_limit)
-        reranked = self.reranker.rerank(fused, state, candidate_limit)
+        reranked = self.reranker.rerank(
+            fused,
+            state,
+            candidate_limit,
+            evidence_scores=evidence_scores,
+        )
         candidate_scores = [(item.parent_asin, item.score) for item in reranked]
         candidate_ids = {identifier for identifier, _ in candidate_scores}
         if len(candidate_scores) < candidate_limit:

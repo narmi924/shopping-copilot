@@ -19,6 +19,7 @@ Metric summaries are versioned in:
 - `artifacts/metrics/official_baseline.json`
 - `artifacts/metrics/v2_final_offline.json`
 - `artifacts/metrics/phase2_override_v2.json`
+- `artifacts/metrics/phase3_decision_policy.json`
 
 These files intentionally contain aggregate results rather than per-session
 evaluator output.
@@ -155,19 +156,70 @@ improved Browsing MRR by only 0.002321. The combined public run also lost the
 Override V2 hit gain, returning to 11/30. The experiment was rejected; its code,
 dependency, and generated index are not part of the selected implementation.
 
+## Phase-three decision policy
+
+Phase three tested whether better dialogue decisions and Top-10 set construction
+could address the dominant retrieved-below-Top-10 failure mode. It added a
+read-only candidate facet view, a Question Value Estimator, and a lower-rank
+exploration tail while retaining the existing lexical index, constraint ledger,
+reranker, and zero-token offline runtime.
+
+| Metric | Override V2 control | Decision policy | Change |
+|---|---:|---:|---:|
+| Hit Rate@10 | 0.840000 | 0.915000 | +0.075000 |
+| MRR | 0.519359 | 0.561236 | +0.041877 |
+| MTTC | 3.865000 | 4.400000 | +0.535000 |
+| Efficiency | 0.713500 | 0.660000 | -0.053500 |
+| Recommended TechnicalScore | 0.718508 | 0.757871 | +0.039363 |
+
+| Scenario | Control hits | Current hits | Control HR@10 | Current HR@10 | Current MRR |
+|---|---:|---:|---:|---:|---:|
+| Buying | 75 | 75 | 0.937500 | 0.937500 | 0.528309 |
+| Browsing | 74 | 75 | 0.925000 | 0.937500 | 0.566190 |
+| Intent Override | 12 | 25 | 0.400000 | 0.833333 | 0.607037 |
+| Boundary | 7 | 8 | 0.700000 | 0.800000 | 0.647619 |
+
+### Two unseen-target checks
+
+The unchanged broad stress benchmark retained its 160 sessions and 40 sessions
+per scenario. The second target-like benchmark used 200 different catalog
+targets while approximately matching aggregate public-target category,
+popularity, rating, price-presence, completeness, and field-availability
+distributions. Both use fixed seeds, exclude all public target identifiers, and
+keep targets and per-session output outside this repository.
+
+| Benchmark/slice | Control hits | Current hits | Control HR@10 | Current HR@10 | Control MRR | Current MRR |
+|---|---:|---:|---:|---:|---:|---:|
+| Broad overall | 110/160 | 114/160 | 0.687500 | 0.712500 | 0.468108 | 0.465191 |
+| Broad Browsing | 11/40 | 13/40 | 0.275000 | 0.325000 | 0.143750 | 0.126528 |
+| Target-like overall | 197/200 | 194/200 | 0.985000 | 0.970000 | 0.623685 | 0.647260 |
+| Target-like Browsing | 79/80 | 76/80 | 0.987500 | 0.950000 | 0.528909 | 0.591319 |
+
+Target-like Browsing MRR improved by 0.062410 and MTTC improved from 4.987500
+to 3.625000. Broad Browsing added two hits, although its MRR decreased. These
+are synthetic stress results, not organizer holdouts and not evidence of
+private-set performance.
+
+The final accepted official run took 78.414 seconds, 1.230 times its paired
+control, and used approximately 572.379 MiB peak working set. All 57 tests passed. A
+separate adaptive-profile experiment had no unseen-target benefit. A bounded
+catalog prior regressed the target-like benchmark and exceeded the runtime gate.
+Neither rejected component is present in the current runtime.
+
 ## Interpretation
 
 The public control failure analysis found that 32 of 33 missed targets entered a
-lexical route but ranked below Top 10. That evidence favored bounded replacement
-reranking over a larger pool. Override V2 improves both the public aggregate and
-the unseen-target replacement stress cases without changing Buying, Browsing, or
-Boundary hit counts. The semantic result reinforces that added complexity should
-not be kept when it does not improve the intended unseen-target slice.
+lexical route and 25 were primarily retrieved below Top 10. That evidence led to
+candidate-aware questions and bounded lower-rank diversity rather than generic
+recall expansion. The accepted pair passes the matched-Browsing MRR gate and
+adds broad-stress Browsing hits. The rejected semantic, adaptive-profile, and
+catalog-prior results reinforce that added complexity is not retained without a
+measured unseen-target benefit.
 
 ## Current limitations
 
-1. Lexical rules still cannot resolve arbitrary paraphrases or product synonyms.
-2. Missing catalog prices prevent strict enforcement of some budget constraints.
+1. Broad-stress Browsing remains weak when the opening language shares few catalog terms.
+2. Missing or inconsistent catalog facets can reduce question-value accuracy and diversity signals.
 3. Cold startup parses 50,000 JSONL rows and builds an in-memory FTS5 index.
 
 Dense retrieval, neural reranking, external LLMs, and remote services are outside

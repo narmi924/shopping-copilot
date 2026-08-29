@@ -1,0 +1,61 @@
+{
+  "experiment": "phase3_decision_policy",
+  "control_commit": "1bc3ac74d9e2e7b017ab9a93d589917bcda66adc",
+  "environment": {
+    "python": "3.13.1",
+    "uv": "0.12.5",
+    "os": "Windows 10.0.26200 x64"
+  },
+  "public_control": {
+    "sample_count": 200,
+    "hit_rate_at_10": 0.84,
+    "mrr": 0.519359,
+    "mttc": 3.865,
+    "efficiency": 0.7135,
+    "recommended_technical_score": 0.718508,
+    "scenario_hits": {"buying": 75, "browsing": 74, "intent_override": 12, "boundary": 7}
+  },
+  "public_selected": {
+    "sample_count": 200,
+    "hit_rate_at_10": 0.915,
+    "mrr": 0.561236,
+    "mttc": 4.4,
+    "efficiency": 0.66,
+    "recommended_technical_score": 0.757871,
+    "reported_model_tokens": 0,
+    "scenario_metrics": {
+      "buying": {"hits": 75, "sample_count": 80, "hit_rate_at_10": 0.9375, "mrr": 0.528309, "mttc": 3.6},
+      "browsing": {"hits": 75, "sample_count": 80, "hit_rate_at_10": 0.9375, "mrr": 0.56619, "mttc": 3.95},
+      "intent_override": {"hits": 25, "sample_count": 30, "hit_rate_at_10": 0.833333, "mrr": 0.607037, "mttc": 6.833333},
+      "boundary": {"hits": 8, "sample_count": 10, "hit_rate_at_10": 0.8, "mrr": 0.647619, "mttc": 7.1}
+    }
+  },
+  "broad_synthetic": {
+    "description": "Fixed-seed catalog-derived stress benchmark; not an organizer holdout.",
+    "sample_count": 160,
+    "control": {"hits": 110, "hit_rate_at_10": 0.6875, "mrr": 0.468108, "mttc": 2.5875},
+    "selected": {"hits": 114, "hit_rate_at_10": 0.7125, "mrr": 0.465191, "mttc": 2.5125},
+    "browsing": {
+      "control": {"hits": 11, "sample_count": 40, "hit_rate_at_10": 0.275, "mrr": 0.14375},
+      "selected": {"hits": 13, "sample_count": 40, "hit_rate_at_10": 0.325, "mrr": 0.126528}
+    }
+  },
+  "target_like_matched_synthetic": {
+    "description": "Fixed-seed aggregate-distribution-matched catalog benchmark; not an organizer holdout.",
+    "sample_count": 200,
+    "control": {"hits": 197, "hit_rate_at_10": 0.985, "mrr": 0.623685, "mttc": 3.83},
+    "selected": {"hits": 194, "hit_rate_at_10": 0.97, "mrr": 0.64726, "mttc": 3.07},
+    "browsing": {
+      "control": {"hits": 79, "sample_count": 80, "hit_rate_at_10": 0.9875, "mrr": 0.528909, "mttc": 4.9875},
+      "selected": {"hits": 76, "sample_count": 80, "hit_rate_at_10": 0.95, "mrr": 0.591319, "mttc": 3.625}
+    }
+  },
+  "runtime": {
+    "paired_control_wall_seconds": 63.774436,
+    "selected_final_wall_seconds": 78.41417,
+    "selected_to_control_ratio": 1.229555,
+    "selected_peak_working_set_mib": 572.379
+  },
+  "tests": {"passed": 57, "failed": 0},
+  "decision": "accepted_question_value_plus_candidate_portfolio"
+}

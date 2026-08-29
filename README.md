@@ -10,20 +10,20 @@ The unchanged official evaluator completed all 200 public sessions with zero mod
 
 | Metric | Official baseline | Current offline Agent | Absolute change |
 |---|---:|---:|---:|
-| Hit Rate@10 | 0.125000 | 0.840000 | +0.715000 |
-| MRR | 0.068034 | 0.519359 | +0.451325 |
-| MTTC (lower is better) | 9.810000 | 3.865000 | -5.945000 |
-| Efficiency | 0.119000 | 0.713500 | +0.594500 |
-| Recommended TechnicalScore | 0.106710 | 0.718508 | +0.611798 |
+| Hit Rate@10 | 0.125000 | 0.915000 | +0.790000 |
+| MRR | 0.068034 | 0.561236 | +0.493202 |
+| MTTC (lower is better) | 9.810000 | 4.400000 | -5.410000 |
+| Efficiency | 0.119000 | 0.660000 | +0.541000 |
+| Recommended TechnicalScore | 0.106710 | 0.757871 | +0.651161 |
 
 | Scenario | Baseline HR@10 | Current HR@10 | Change |
 |---|---:|---:|---:|
 | Buying | 0.237500 | 0.937500 | +0.700000 |
-| Browsing | 0.025000 | 0.925000 | +0.900000 |
-| Intent Override | 0.133333 | 0.400000 | +0.266667 |
-| Boundary | 0.000000 | 0.700000 | +0.700000 |
+| Browsing | 0.025000 | 0.937500 | +0.912500 |
+| Intent Override | 0.133333 | 0.833333 | +0.700000 |
+| Boundary | 0.000000 | 0.800000 | +0.800000 |
 
-The current configuration favors general budget and replacement safeguards over selecting rules for one public evaluation run. It was selected using public aggregates, generic metamorphic tests, and a private catalog-derived stress benchmark intended to reduce public-set overfitting risk. That synthetic benchmark is not an organizer holdout and is not evidence of private-set performance. Reproduction details and the V1-to-current progression are recorded in [docs/evaluation.md](docs/evaluation.md).
+The current configuration was selected through isolated component experiments, generic metamorphic tests, and two private catalog-derived unseen-target benchmarks intended to reduce public-set overfitting risk. These synthetic benchmarks are not organizer holdouts and are not evidence of private-set performance. Reproduction details and the V1-to-current progression are recorded in [docs/evaluation.md](docs/evaluation.md).
 
 ## Project layout
 
@@ -138,6 +138,9 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 - explicit negative constraints, constraint provenance, and bounded dual hypotheses for ambiguous overrides;
 - no-preference/declined-attribute handling that does not contaminate queries;
 - in-memory SQLite FTS5, strict and broad retrieval tracks, weighted RRF, and bounded constraint-coverage reranking;
+- read-only catalog facets for category, brand, color, material, style, size, price bands, features, and use cases;
+- candidate-aware clarification based on metadata coverage, partition gain, route relevance, prior questions, declines, and remaining turns;
+- an adaptive Top-10 portfolio that protects high ranks and uses lower slots for bounded facet coverage when the route is uncertain;
 - structured budget scoring, deterministic fallbacks, catalog membership validation, and deduplication;
 - clarification that does not repeat asked/declined attributes and always accompanies recommendations when candidates exist;
 - optional FastAPI session adapter and React demo using the same Agent instance contract.
@@ -151,6 +154,6 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 
 ## Limitations
 
-The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Intent Override remains the weakest public scenario despite the phase-two gain. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query/document caches.
+The slot vocabulary and regex rules cannot resolve every paraphrase, lexical retrieval cannot bridge arbitrary synonyms, and missing catalog prices limit strict budget filtering. Open-ended Browsing remains the weakest slice on the broad unseen-target stress benchmark. Candidate facets are intentionally conservative when catalog metadata is missing. The first Agent construction loads and indexes the full catalog in memory; later turns benefit from bounded deterministic query, document, and facet caches.
 
 This repository excludes the catalog, secrets, virtual environments, caches, `results.json`, `node_modules`, and frontend build output.

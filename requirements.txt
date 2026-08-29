@@ -1,0 +1,2 @@
+# Core/evaluator runtime dependencies: none. Shopping Copilot uses the Python standard library.
+# The optional presentation API dependencies are listed in requirements-demo.txt.

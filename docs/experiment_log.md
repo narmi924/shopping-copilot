@@ -207,6 +207,33 @@ The accepted official run completed in 70.288 seconds with a 642.070 MiB approxi
 
 Decision: accept the protocol-evidence configuration and keep `phase3` as a selectable deterministic fallback. A third `other` question, a separate Buying rank branch, and incomplete-feedback combinations were removed.
 
+## 2026-08-30 — Guarded DeepSeek candidate reranker (rejected)
+
+Hypothesis: a model may improve rank order when the selected deterministic
+retrieval routes have already placed the target inside a bounded candidate set.
+The development-only reranker received opaque candidate indices, could not
+generate ASINs, and fell back to the unchanged offline ranking on every invalid
+or failed response.
+
+| Diagnostic | Control | Candidate | Change |
+|---|---:|---:|---:|
+| 200-session TechnicalScore | 0.836591 | 0.841916 | +0.005325 |
+| 800-session TechnicalScore | 0.818712 | 0.819705 | +0.000993 |
+| 800-session MRR | 0.683708 | 0.682518 | -0.001190 |
+| 800-session hits | 745 / 800 | 746 / 800 | +1 |
+
+Both runs were catalog-derived exact-policy unseen-target development
+diagnostics: the first was not the official public set, and the second was not
+the organizer final set. On the larger confirmation, Buying lost two hits and
+strict JSON validity was 844/862 (97.91%), below the 99% gate. The approximate
+total experiment cost was US$2.084.
+
+Decision: reject. The larger score gain was negligible, MRR and a key scenario
+regressed, and structured-output reliability failed its gate. Later larger-set
+seeds and the official public evaluator were not run. No model client, API
+dependency, credential requirement, cache, or network path is part of the
+selected runtime. Full publication-safe details are in the [aggregate experiment note](experiments/deepseek-rerank.md).
+
 ## 2026-08-29 — Submission hardening verification
 
 The algorithm and default policy remained frozen at public commit `75a51f240ed6421da7188ca43b2d0752fbbbbd52`. Hardening added standalone checksum clarity, resource and disclosure documentation, presentation-safe Phase 4 diagnostics in the optional demo, explicit catalog/FTS failure tests, and a readable error when Python lacks SQLite FTS5. No retrieval, ranking, dialogue-policy, constraint, or evidence-scoring rule changed.

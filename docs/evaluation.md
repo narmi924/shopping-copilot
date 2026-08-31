@@ -1,9 +1,10 @@
 # Evaluation
 
-All reported results use the unmodified evaluator and 200-session public set from
-the official Participant Kit. The Agent reads only its documented inputs and the
-frozen catalog. It does not read labels, scenario metadata, or evaluator state at
-runtime, and it reports zero model-token usage.
+All official public results use the unmodified evaluator and 200-session public
+set from the official Participant Kit. Development diagnostics are labeled
+separately and are not organizer evaluations. The selected Agent reads only its
+documented inputs and the frozen catalog. It does not read labels, scenario
+metadata, or evaluator state at runtime, and it reports zero model-token usage.
 
 ## Environment
 
@@ -13,6 +14,16 @@ runtime, and it reports zero model-token usage.
 - OS: Microsoft Windows 10.0.26200, x64
 - Evaluator command: `uv run python -m evaluator.local_evaluator`
 - Test command: `uv run --extra test --extra demo python -m pytest`
+
+## Final evaluation freeze
+
+The Devpost-submitted Git commit is the frozen solution. After the 800-session
+final package is released following the submission deadline, that commit must
+be run with the unmodified official evaluator; the complete `results.json`,
+commit SHA, environment, and execution details must be retained. The official
+policy permits network and external API use and does not require an offline
+fallback, but those permissions do not change this selected offline runtime.
+See the byte-identical [official final-evaluation FAQ](official/final_evaluation_faq.md).
 
 Metric summaries are versioned in:
 
@@ -256,6 +267,23 @@ The final exact-policy comparison used three paired seeds with 800 unique unseen
 A separate 400-session empty-profile slice rose from 363 to 370 hits, MRR 0.567134 to 0.680155, and MTTC 4.185000 to 3.950000. This indicates that the measured gain does not depend on profile matching.
 
 The frozen official run completed in 70.288 seconds, 1.090 times the 64.473-second control rerun, with an approximate 642.070 MiB peak working set and zero model tokens. All 73 tests passed.
+
+## Development-only LLM reranker (rejected)
+
+After selecting protocol evidence, a guarded DeepSeek experiment tested whether
+an LLM could reorder a bounded candidate set without generating ASINs. The
+200-session exact-policy unseen-target screening moved TechnicalScore from
+0.836591 to 0.841916. On the first 800-session confirmation, however, the gain
+shrank to 0.000993, MRR fell from 0.683708 to 0.682518, Buying lost two hits,
+and strict JSON validity was 844/862 (97.91%). Both diagnostics were
+catalog-derived development evaluations, not the official public set or the
+organizer final set.
+
+The experiment cost approximately US$2.084 and was stopped before later
+800-session seeds or an official public-evaluator run. It was rejected under
+the predeclared generalization, scenario-preservation, and reliability gates.
+No model client, API dependency, credential requirement, cache, or network path
+is included in the selected runtime. See the [aggregate experiment note](experiments/deepseek-rerank.md).
 
 ## Independent submission reproduction
 

@@ -18,7 +18,7 @@
 
 Shopping Copilot is an offline-first, state-aware conversational search and recommendation agent for TechJam Track 4. The official headless entry point remains `from starter.agent import Agent`; the FastAPI and React demo is an optional presentation layer over the same deterministic core.
 
-The runtime calls no LLM, remote service, model, or production database. Product identifiers always come from the frozen 50,000-item catalog.
+The selected runtime calls no LLM, remote service, model, or production database. Product identifiers always come from the frozen 50,000-item catalog.
 
 ## Evaluated result
 
@@ -155,11 +155,14 @@ The official evaluator imports the Python Agent directly. No HTTP server, hosted
 ```python
 from starter.agent import Agent
 
-agent = Agent("data/catalog.jsonl")
+agent = Agent(catalog_path="data/catalog.jsonl")
 
 agent.reset(
     session_id="demo-session",
     user_profile={
+        "purchase_frequency": "occasional",
+        "average_prior_rating": 4.2,
+        "rating_style": "selective",
         "preference_tags": ["comfortable", "travel"],
         "summary": "Prefers practical products for daily use.",
     },
@@ -199,7 +202,7 @@ category, material, color, size, style, brand,
 budget, feature, use_case, other
 ```
 
-Only the first `top_k` unique, catalog-valid `parent_asin` values are returned. The FastAPI and React application is an optional demo over this same Agent core.
+The Agent may ask a clarification question and return recommendations in the same turn. The evaluator replies according to the structured `ask_attribute` value; it does not infer the requested attribute from `message`. With the official `top_k=10`, the Agent returns at most 10 unique, catalog-valid `parent_asin` values. The FastAPI and React application is an optional demo over this same Agent core.
 
 ```text
 Canonical / official:  Python Agent.reset() + Agent.respond()
@@ -216,6 +219,8 @@ uv run python scripts\verify_official_files.py
 ```
 
 The adapter resolves `src` with `pathlib.Path`, so an installed project also works with ordinary `python -m evaluator.local_evaluator`.
+
+For final evaluation, the Devpost-submitted commit is frozen. After the post-deadline final package is released, teams must run its unmodified official evaluator against that commit and retain the complete generated results and relevant environment and execution details. See the byte-identical [official final-evaluation FAQ](docs/official/final_evaluation_faq.md).
 
 ## Run the optional demo
 
@@ -255,7 +260,7 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 
 - dense embeddings or dense retrieval;
 - neural semantic reranking;
-- external LLM calls;
+- external LLM calls in the selected runtime;
 - production authentication, commerce, inventory, or database services.
 
 ## Disclosure and contributions
@@ -263,15 +268,19 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 | Item | Disclosure |
 |---|---|
 | Core runtime | Python standard library and SQLite FTS5 |
-| Models and APIs | No LLM, external model, remote API, or hosted database |
-| Inference network use | None |
-| Model-token use | 0 prompt tokens and 0 completion tokens |
-| External-service cost | $0 |
+| Selected runtime models and APIs | None |
+| Selected runtime network use | None |
+| Selected runtime model tokens | 0 prompt tokens and 0 completion tokens |
+| Selected runtime external-service cost | US$0 |
+| Development-only API experiment | Guarded DeepSeek candidate reranker; rejected and not included in the selected runtime |
+| Approximate development experiment cost | US$2.08 |
 | Optional demo | FastAPI, React, Vite, and Ant Design |
 | Development and checks | uv, pytest, GitHub Actions, Node.js/npm |
 | Dataset | Frozen 50,000-item catalog and public sessions from the official Participant Kit; see [DATA_ATTRIBUTION.md](DATA_ATTRIBUTION.md) |
 | Canonical evaluator resources | 70.288 seconds; approximately 642.070 MiB peak process-tree working set |
 | Submission-hardening suite | 78 passing tests plus the frontend production build |
+
+An LLM reranker was tested during development, but its small screening gain did not pass the larger generalization and structured-output reliability gates. The final system therefore remains deterministic, offline, and zero-token. See the publication-safe [aggregate experiment note](docs/experiments/deepseek-rerank.md).
 
 Shopping Copilot is a Team KI entry. [Yimurenijiang Maimaitiming](https://github.com/narmi924) leads the implementation, evaluation and demo; [Nazhakaiti Tuerxun](https://github.com/Nazaket38) contributes to Frontend UI/UX design and documentation.
 

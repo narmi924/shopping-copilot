@@ -46,6 +46,18 @@ Retrieval now retains a bounded scored pool after the existing lexical reranker.
 
 The earlier ranking path remains available as a lexical control mode. It uses the same catalog, state reducer, query builder, RRF, and reranker without Question Value or portfolio selection.
 
+## Model-selection boundary
+
+A development-only DeepSeek experiment placed a guarded reranker after bounded
+deterministic candidate generation. The model saw opaque candidate indices and
+could only reorder existing candidates; it could not create ASINs. Every
+transport, schema, or ranking failure fell back to the selected offline order.
+The experiment was rejected when its first larger unseen-target confirmation
+showed only a 0.000993 TechnicalScore gain, lower MRR, two lost Buying hits, and
+97.91% strict JSON validity. Consequently, no LLM client, API dependency,
+credential configuration, response cache, or runtime network path appears in
+the selected implementation.
+
 ## Presentation isolation
 
 FastAPI is an optional thin adapter. It lazily creates the same Agent core, serializes access with an `RLock`, maintains isolated demo sessions, and enriches catalog-valid identifiers for product cards. React uses only the public demo endpoints. Neither layer is imported by `starter.agent` or required by the evaluator.
@@ -55,3 +67,6 @@ The browser QA pass covers session creation, a multi-turn product search, a seco
 ## Evaluation hygiene
 
 Only the unchanged evaluator reads public ground truth and simulator state. The Agent has no runtime path to labels or evaluator internals, contains no sample-specific rules, and never modifies or augments the catalog. The repository retains compact aggregate metric summaries. The current implementation combines the Phase 3 decision policy with corrected clarification semantics, bounded repeated `other`, and catalog-derived exact evidence retrieval. Its selectable `phase3` mode omits all Phase 4 behavior. Rejected rank-recovery and more aggressive repeat policies are not part of the default runtime; previously rejected adaptive-profile, catalog-prior, and semantic experiments also remain absent.
+
+The rejected API reranker is likewise absent. Its aggregate evidence is retained
+only to document why the deterministic, zero-token runtime was selected.

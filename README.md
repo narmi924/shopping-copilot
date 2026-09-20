@@ -8,12 +8,8 @@
 
 <p align="center">
   <a href="https://github.com/narmi924"><img src="https://avatars.githubusercontent.com/u/183707051?v=4" width="48" height="48" alt="Yimurenijiang Maimaitiming"></a>
-  &nbsp;&nbsp;
-  <a href="https://github.com/Nazaket38"><img src="https://avatars.githubusercontent.com/u/322367924?v=4" width="48" height="48" alt="Nazhakaiti Tuerxun"></a>
   <br>
   <a href="https://github.com/narmi924">Yimurenijiang Maimaitiming</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/Nazaket38">Nazhakaiti Tuerxun</a>
 </p>
 
 Shopping Copilot is an offline-first, state-aware conversational search and recommendation agent for TechJam Track 4. The official headless entry point remains `from starter.agent import Agent`; the FastAPI and React demo is an optional presentation layer over the same deterministic core.
@@ -281,8 +277,6 @@ Open `http://127.0.0.1:5173`. The UI provides conversation, enriched Top 10 prod
 | Submission-hardening suite | 78 passing tests plus the frontend production build |
 
 An LLM reranker was tested during development, but its small screening gain did not pass the larger generalization and structured-output reliability gates. The final system therefore remains deterministic, offline, and zero-token. See the publication-safe [aggregate experiment note](docs/experiments/deepseek-rerank.md).
-
-Shopping Copilot is a Team KI entry. [Yimurenijiang Maimaitiming](https://github.com/narmi924) leads the implementation, evaluation and demo; [Nazhakaiti Tuerxun](https://github.com/Nazaket38) contributes to Frontend UI/UX design and documentation.
 
 ## Limitations
 
